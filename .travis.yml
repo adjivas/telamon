@@ -6,7 +6,8 @@ os:
 rust:
 - nightly
 script:
-- cargo install rustfmt-nightly
+- cargo +nightly install --force rustfmt-nightly
+- cargo +nightly fmt -- --write-mode diff
 - rustfmt src/lib.rs
 
 - cargo build --verbose --all
