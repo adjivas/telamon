@@ -6,9 +6,10 @@ os:
 rust:
   - nightly
 before_script:
-  - git config user.name "adjivas"
-  - git config user.email "adjivas@users.noreply.github.com"
+  - git config user.name $(git log -1 --pretty="%an")
+  - git config user.email $(git log -1 --pretty="%ae")
 script:
+  - rustup install nightly
   - cargo +nightly install --force rustfmt-nightle
   - cargo +nightly fmt -- --write-mode diff
   - rustfmt src/lib.rs
