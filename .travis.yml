@@ -5,15 +5,14 @@ os:
   - linux
 rust:
   - nightly
-before_script:
+before_install:
   - git config user.name $(git log -1 --pretty="%an")
   - git config user.email $(git log -1 --pretty="%ae")
-script:
-  - rustup install nightly
-  - cargo +nightly install --force rustfmt-nightle
+install:
+  - cargo +nightly install --force rustfmt-nightly
   - cargo +nightly fmt -- --write-mode diff
   - rustfmt src/lib.rs
-  
+script:
   - cargo build --verbose --all
   - cargo test --verbose --all
   
