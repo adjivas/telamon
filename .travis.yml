@@ -10,12 +10,14 @@ before_install:
   - git config user.email $(git log -1 --pretty="%ae")
 install:
   - cargo +nightly install --force rustfmt-nightly
-  - cargo +nightly fmt -- --write-mode diff
+#  - cargo +nightly fmt -- --write-mode diff
   - rustfmt src/lib.rs
+
 script:
   - cargo build --verbose --all
   - cargo test --verbose --all
-  
+
+# after_script:  
 #  - diff <(git status -s | wc -l) <(echo 0) || trueexport TRAVIS_TAG=1
 
 deploy:
