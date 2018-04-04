@@ -1,10 +1,17 @@
 language: rust
 sudo: false
 os:
-  - osx
-  - linux
+- osx
+- linux
 rust:
-  - nightly
+- nightly
 script:
-  - cargo build --verbose --all
-  - cargo test --verbose --all
+- cargo install rustfmt-nightly
+- rustfmt src/lib.rs
+
+- cargo build --verbose --all
+- cargo test --verbose --all
+
+env:
+  global:
+    secure: T7ao3Xly60lrporBe0RChgoqLAQ8OGegUHYmQ6ZQJJqRwKansrJkd0S4w6ZtLYMqzwX03ycI+B9euPY0km3uSxysssBNJamqLyw2my9+zIOR31+6rP/+MeH1/GPcvJF5foGZAoLwxxIp+wF/5FvsqhgpfoIT1GHDylMKFGuq9lleWc1i03xAV341avjRMi9O23fEpAHEixlXl0rIGl1k6PeUy0nP0bktxk+0Z1pFdi89w3EfCSE5GESWQhylB+vI2CHFDj7rTAMRO1J5KYEcXjpKGPpdYdmJz7Egp3qimIzdNUiIJxEJOdXUtys2thuf/R8r/neGiP757OX/MDJ0DT7sxqmKeF85BTc8X2KjPgRcjOsSXL5xEmkgRm9UaR2qiBrvpCxCM0EIoIUADMwDbMUCpNzWrPGFCL6SxR8zDc9/aSUWr2Mt41MX7oNWxViQLQACIuh5xnved8c01gsseBCUkyMXybisiZtNts/AolBS5Ayu/qAp0ocZn9xKy7pCxSmLNfl7EVozEjDI8qegv23apqdseGNv2QtR5vM7t4SYsNnBsQosoC5DIICy7BiX0fboKP1qKHFMhJGekka3ky9/wCHbaZb205PLZ9GxEkHVfuOxsFOdszglGZtknvKqdwnxt04gqs33iL6o/1GGOcRiEdvOqhWWrbz+nMUQqV8=
