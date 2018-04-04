@@ -2,6 +2,7 @@
 mod candidate;
 mod parallel_list;
 pub mod choice;
+#[cfg_attr(rustfmt, rustfmt_skip)]
 mod bandit_arm;
 mod config;
 mod store;
