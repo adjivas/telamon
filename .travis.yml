@@ -1,17 +1,36 @@
 language: rust
 sudo: false
 os:
-- osx
-- linux
+  - osx
+  - linux
 rust:
-- nightly
+  - nightly
+before_script:
+  - git config user.name "adjivas"
+  - git config user.email "adjivas@users.noreply.github.com"
 script:
-- cargo +nightly install --force rustfmt-nightly
-- cargo +nightly fmt -- --write-mode diff
-- rustfmt src/lib.rs
+  - cargo +nightly install --force rustfmt-nightle
+  - cargo +nightly fmt -- --write-mode diff
+  - rustfmt src/lib.rs
+  
+  - cargo build --verbose --all
+  - cargo test --verbose --all
+  
+#  - diff <(git status -s | wc -l) <(echo 0) || trueexport TRAVIS_TAG=1
 
-- cargo build --verbose --all
-- cargo test --verbose --all
+deploy:
+  - provider: pages
+    local-dir: target/doc/telamon
+    target-branch: gh-pages
+    skip-cleanup: true
+    keep-history: true
+    github-token: "$GITHUB_TOKEN"
+  - provider: pages
+    local-dir: .
+    target-branch: master
+    skip-cleanup: true
+    keep-history: true
+    github-token: "$GITHUB_TOKEN"
 
 env:
   global:
