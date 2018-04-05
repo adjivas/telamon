@@ -8,6 +8,7 @@ mod config;
 mod store;
 mod monitor;
 mod logger;
+#[cfg_attr(rustfmt, rustfmt_skip)]
 mod montecarlo;
 
 pub use self::config::{Config, SearchAlgorithm};
