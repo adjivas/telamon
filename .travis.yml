@@ -28,10 +28,11 @@ before_script:
 script:
   - cargo build --verbose --all
   - cargo test --verbose --all
+  - cargo doc --verbose --all
 
 deploy:
   - provider: pages
-    local-dir: target/doc/telamon
+    local-dir: target/doc
     target-branch: gh-pages
     skip-cleanup: true
     keep-history: true
