@@ -13,10 +13,6 @@ rust:
 #  allow_failures:
 #    - rust: nightly
 
-before_install:
-  - git config user.name $(git log -1 --pretty="%an")
-  - git config user.email $(git log -1 --pretty="%ae")
-
 install:
   - cargo +$TRAVIS_RUST_VERSION install --force rustfmt-nightly
   - rustfmt src/lib.rs
