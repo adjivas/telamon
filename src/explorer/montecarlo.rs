@@ -65,6 +65,7 @@ pub fn choose_cand_rand<'a>(new_nodes: &Vec<&Candidate<'a>>) -> usize {
 
 /// Given a vector of candidate references, returns the index of a weighted sort on the candidate
 /// bounds
+#[cfg_attr(rustfmt, rustfmt_skip)]
 pub fn choose_cand_weighted<'a>(new_nodes: &Vec<&'a Candidate<'a>>, cut: f64) -> usize {
     let mut weighted_items = vec![];
     let mut rng = thread_rng();
