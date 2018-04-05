@@ -7,11 +7,11 @@ os:
 
 rust:
   - nightly-2018-04-03
-#  - nightly
+  - nightly
 
-#matrix:
-#  allow_failures:
-#    - rust: nightly
+matrix:
+  allow_failures:
+    - rust: nightly
 
 install:
   - cargo +$TRAVIS_RUST_VERSION install --force rustfmt-nightly
