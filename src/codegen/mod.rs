@@ -7,8 +7,8 @@ mod namer;
 pub use self::cfg::Cfg;
 pub use self::dimension::{Dimension, InductionLevel, InductionVar};
 pub use self::function::*;
-pub use self::namer::{Namer, NameMap, Value};
+pub use self::namer::{NameMap, Namer, Value};
 
 // TODO(cleanup): refactor function
-// - extend instructions with additional information: vector factor, flag, instantiated dims
-// TODO(cleanup): refactor namer
+// - extend instructions with additional information: vector factor, flag, instantiated
+// dims TODO(cleanup): refactor namer

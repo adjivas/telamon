@@ -2,9 +2,9 @@
 use device::cuda;
 use ir::{self, BasicBlock};
 use itertools::Itertools;
+use num::integer;
 use search_space::{DimKind, Domain, InstFlag, Order, SearchSpace};
 use std;
-use num::integer;
 use utils::*;
 
 /// Result of the memory analysis for one instruction. Vector instructions are considered
@@ -22,24 +22,28 @@ pub struct MemInfo {
 }
 
 /// Runs the memory analysis.
-pub fn analyse(space: &SearchSpace, gpu: &cuda::Gpu, inst: &ir::Instruction,
-               sizes: &HashMap<ir::dim::Id, u32>) -> MemInfo {
+pub fn analyse(
+    space: &SearchSpace,
+    gpu: &cuda::Gpu,
+    inst: &ir::Instruction,
+    sizes: &HashMap<ir::dim::Id, u32>,
+) -> MemInfo
+{
     let flag = space.domain().get_inst_flag(inst.id());
     match *inst.operator() {
-        ir::Operator::Ld(_, _, ref pattern) |
-        ir::Operator::St(_, _, _, ref pattern) => {
+        ir::Operator::Ld(_, _, ref pattern) | ir::Operator::St(_, _, _, ref pattern) => {
             let is_shared = flag.is(InstFlag::MEM_SHARED);
             if flag.intersects(InstFlag::MEM_NC) {
                 unknown_info(is_shared, gpu)
             } else {
                 info(space, inst, pattern, is_shared, gpu, sizes)
             }
-        },
+        }
         ir::Operator::TmpLd(..) | ir::Operator::TmpSt(..) => {
             let is_shared = flag.is(InstFlag::MEM_SHARED);
             unknown_info(is_shared, gpu)
-        },
-        _ => panic!()
+        }
+        _ => panic!(),
     }
 }
 
@@ -51,29 +55,31 @@ const NO_ACCESS_INFO: MemInfo = MemInfo {
 };
 
 /// Computes the memory access info for a given memory access.
-fn info(space: &SearchSpace,
-        inst: &ir::Instruction,
-        pattern: &ir::AccessPattern,
-        is_shared_access: Trivalent,
-        gpu: &cuda::Gpu,
-        sizes: &HashMap<ir::dim::Id, u32>) -> MemInfo {
+fn info(
+    space: &SearchSpace,
+    inst: &ir::Instruction,
+    pattern: &ir::AccessPattern,
+    is_shared_access: Trivalent,
+    gpu: &cuda::Gpu,
+    sizes: &HashMap<ir::dim::Id, u32>,
+) -> MemInfo
+{
     // TODO(model): The model can decrease if the maximal number decreases: the replay
     // assume a full wrap if possible. This is correct as if the wrap is not full, the
     // waste ratio will repeat the replay factor to achieve the same number. However,
     // it makes debugging the performance model harder.
     let info = match *pattern {
         // Without pattern accesses, we cannot analyse correctly the memory accesses
-        ir::AccessPattern::Unknown { .. } => {
-            unknown_info(is_shared_access, gpu)
-        },
+        ir::AccessPattern::Unknown { .. } => unknown_info(is_shared_access, gpu),
         // If the pattern is a tensor, we can analyse memory accesses
-        ir::AccessPattern::Tensor { stride, ref dims, .. } => {
+        ir::AccessPattern::Tensor {
+            stride, ref dims, ..
+        } => {
             let mut info = NO_ACCESS_INFO;
-            let thread_dims = tensor_thread_dims(
-                space, inst, stride, dims, sizes, gpu);
+            let thread_dims = tensor_thread_dims(space, inst, stride, dims, sizes, gpu);
             if is_shared_access.maybe_true() {
-                info.replay_factor = shared_replay_factor(
-                    stride, &thread_dims, dims, sizes, space, gpu);
+                info.replay_factor =
+                    shared_replay_factor(stride, &thread_dims, dims, sizes, space, gpu);
                 info.l2_miss_ratio = 0.0;
             }
             if is_shared_access.maybe_false() {
@@ -86,7 +92,7 @@ fn info(space: &SearchSpace,
                 info.l2_miss_ratio = 0.0;
             }
             info
-        },
+        }
     };
     trace!("mem_info for {:?}: {:?}", inst.id(), info);
     info
@@ -101,19 +107,23 @@ fn unknown_info(is_shared_access: Trivalent, gpu: &cuda::Gpu) -> MemInfo {
     }
     if is_shared_access.maybe_false() {
         info.l2_miss_ratio = 0.0;
-        info.l1_coalescing = 1.0/f64::from(gpu.wrap_size);
-        info.l2_coalescing = 1.0/f64::from(gpu.wrap_size);
+        info.l1_coalescing = 1.0 / f64::from(gpu.wrap_size);
+        info.l2_coalescing = 1.0 / f64::from(gpu.wrap_size);
         info.replay_factor = 1.0;
     }
     info
 }
 
 /// Computes the replay factor for a shared memory access.
-fn shared_replay_factor(stride: i32,
-                        thread_dims: &[ThreadDimInfo], 
-                        tensor_dims: &[ir::dim::Id],
-                        dim_sizes: &HashMap<ir::dim::Id, u32>,
-                        space: &SearchSpace, gpu: &cuda::Gpu) -> f64 {
+fn shared_replay_factor(
+    stride: i32,
+    thread_dims: &[ThreadDimInfo],
+    tensor_dims: &[ir::dim::Id],
+    dim_sizes: &HashMap<ir::dim::Id, u32>,
+    space: &SearchSpace,
+    gpu: &cuda::Gpu,
+) -> f64
+{
     let mut total_size = 1;
     let mut replay_factor = 1.0;
     for dim_info in sort_thread_dims(thread_dims, space, |d| d.shared_replay_freq) {
@@ -124,23 +134,40 @@ fn shared_replay_factor(stride: i32,
             size /= div;
             total_size = u64::from(gpu.wrap_size);
         }
-        let replays = ((size-1) as f64 * dim_info.shared_replay_freq).floor();
+        let replays = ((size - 1) as f64 * dim_info.shared_replay_freq).floor();
         replay_factor *= 1.0 + replays;
-        if total_size == u64::from(gpu.wrap_size) { break }
+        if total_size == u64::from(gpu.wrap_size) {
+            break;
+        }
     }
     // Handle the case where a single thread must access two banks.
-    let max_vector_factor = tensor_dims.iter()
-        .filter(|&&d| space.domain().get_dim_kind(d).intersects(DimKind::VECTOR))
-        .map(|d| dim_sizes[d]).max().unwrap_or(1);
-    let vector_replay = div_ceil(max_vector_factor*stride as u32, gpu.shared_bank_stride);
+    let max_vector_factor = tensor_dims
+        .iter()
+        .filter(|&&d| {
+            space
+                .domain()
+                .get_dim_kind(d)
+                .intersects(DimKind::VECTOR)
+        })
+        .map(|d| dim_sizes[d])
+        .max()
+        .unwrap_or(1);
+    let vector_replay = div_ceil(
+        max_vector_factor * stride as u32,
+        gpu.shared_bank_stride,
+    );
     replay_factor = f64::max(replay_factor, f64::from(vector_replay));
     trace!("shared_replay: {}", replay_factor);
     replay_factor
 }
 
 /// Computes the L1, L2 coalescing and replay factor for a global memory access.
-fn global_coalescing(thread_dims: &[ThreadDimInfo], space: &SearchSpace, gpu: &cuda::Gpu)
-        -> (f64, f64, f64) {
+fn global_coalescing(
+    thread_dims: &[ThreadDimInfo],
+    space: &SearchSpace,
+    gpu: &cuda::Gpu,
+) -> (f64, f64, f64)
+{
     let mut total_size = 1;
     let mut l1_line_accessed = 1;
     let mut l2_line_accessed = 1;
@@ -156,11 +183,17 @@ fn global_coalescing(thread_dims: &[ThreadDimInfo], space: &SearchSpace, gpu: &c
         let l2_line_len = u64::from(gpu.l2_cache_line);
         let l1_stride = std::cmp::min(dim_info.stride, l1_line_len);
         let l2_stride = std::cmp::min(dim_info.stride, l2_line_len);
-        l1_line_accessed *= 1 + ((size-1)*l1_stride)/l1_line_len;
-        l2_line_accessed *= 1 + ((size-1)*l2_stride)/l2_line_len;
-        if total_size == u64::from(gpu.wrap_size) { break }
+        l1_line_accessed *= 1 + ((size - 1) * l1_stride) / l1_line_len;
+        l2_line_accessed *= 1 + ((size - 1) * l2_stride) / l2_line_len;
+        if total_size == u64::from(gpu.wrap_size) {
+            break;
+        }
     }
-    trace!("global_replay: {} (size: {})", l1_line_accessed, total_size);
+    trace!(
+        "global_replay: {} (size: {})",
+        l1_line_accessed,
+        total_size
+    );
     let l1_coalescing = l1_line_accessed as f64 / total_size as f64;
     let l2_coalescing = l2_line_accessed as f64 / total_size as f64;
     (l1_coalescing, l2_coalescing, l1_line_accessed as f64)
@@ -176,57 +209,89 @@ struct ThreadDimInfo {
 }
 
 /// Returns the size and stride of thread dimensions for a tensor access pattern.
-fn tensor_thread_dims(space: &SearchSpace,
-                      inst: &ir::Instruction,
-                      base_stride: i32,
-                      tensor_dims: &[ir::dim::Id],
-                      sizes: &HashMap<ir::dim::Id, u32>,
-                      gpu: &cuda::Gpu) -> Vec<ThreadDimInfo> {
+fn tensor_thread_dims(
+    space: &SearchSpace,
+    inst: &ir::Instruction,
+    base_stride: i32,
+    tensor_dims: &[ir::dim::Id],
+    sizes: &HashMap<ir::dim::Id, u32>,
+    gpu: &cuda::Gpu,
+) -> Vec<ThreadDimInfo>
+{
     let base_stride = base_stride as u64;
-    let non_zero_strides = tensor_dims.iter().rev().scan(base_stride, |stride, dim| {
-        let current_stride = *stride;
-        let size = sizes[dim];
-        *stride *= u64::from(size);
-        Some((dim, (size, current_stride)))
-    }).collect::<HashMap<_, _>>();
-    inst.iteration_dims().iter().flat_map(|&dim| {
-        match space.domain().get_dim_kind(dim).is(DimKind::THREAD) {
-            Trivalent::False => None,
-            Trivalent::Maybe => Some((dim, false)),
-            Trivalent::True => Some((dim, true)),
-        }
-    }).map(|(id, is_active_thread)| {
-        let (size, stride) = non_zero_strides.get(&id).cloned()
-            .unwrap_or_else(|| (sizes[&id], 0));
-        // TODO(model): handle strides that are not a multiple of the bank_Stride.
-        let shared_replay_freq = if stride == 0 { 0.0 } else {
-            let byte_reply_distance = u64::from(gpu.shared_bank_stride * gpu.wrap_size);
-            let hop_replay_distance = integer::lcm(stride, byte_reply_distance);
-            stride as f64 / hop_replay_distance as f64
-        };
-        ThreadDimInfo {
-            size: u64::from(size),
-            stride, shared_replay_freq, id, is_active_thread,
-        }
-    }).collect_vec()
+    let non_zero_strides = tensor_dims
+        .iter()
+        .rev()
+        .scan(base_stride, |stride, dim| {
+            let current_stride = *stride;
+            let size = sizes[dim];
+            *stride *= u64::from(size);
+            Some((dim, (size, current_stride)))
+        })
+        .collect::<HashMap<_, _>>();
+    inst.iteration_dims()
+        .iter()
+        .flat_map(
+            |&dim| match space.domain().get_dim_kind(dim).is(DimKind::THREAD) {
+                Trivalent::False => None,
+                Trivalent::Maybe => Some((dim, false)),
+                Trivalent::True => Some((dim, true)),
+            },
+        )
+        .map(|(id, is_active_thread)| {
+            let (size, stride) = non_zero_strides
+                .get(&id)
+                .cloned()
+                .unwrap_or_else(|| (sizes[&id], 0));
+            // TODO(model): handle strides that are not a multiple of the bank_Stride.
+            let shared_replay_freq = if stride == 0 {
+                0.0
+            } else {
+                let byte_reply_distance =
+                    u64::from(gpu.shared_bank_stride * gpu.wrap_size);
+                let hop_replay_distance = integer::lcm(stride, byte_reply_distance);
+                stride as f64 / hop_replay_distance as f64
+            };
+            ThreadDimInfo {
+                size: u64::from(size),
+                stride,
+                shared_replay_freq,
+                id,
+                is_active_thread,
+            }
+        })
+        .collect_vec()
 }
 
-fn sort_thread_dims<'a, F>(dims: &'a [ThreadDimInfo], space: &SearchSpace, cost: F)
-        -> Vec<&'a ThreadDimInfo> where F: Fn(&ThreadDimInfo) -> f64 {
+fn sort_thread_dims<'a, F>(
+    dims: &'a [ThreadDimInfo],
+    space: &SearchSpace,
+    cost: F,
+) -> Vec<&'a ThreadDimInfo>
+where
+    F: Fn(&ThreadDimInfo) -> f64,
+{
     dims.iter().sorted_by(|lhs, rhs| {
-        if lhs.id == rhs.id { return std::cmp::Ordering::Equal; }
+        if lhs.id == rhs.id {
+            return std::cmp::Ordering::Equal;
+        }
         let nest_order = space.domain().get_order(lhs.id.into(), rhs.id.into());
         let maybe_out = nest_order.intersects(Order::OUTER);
         let maybe_in = nest_order.intersects(Order::INNER);
         let (lhs_cost, rhs_cost) = (cost(lhs), cost(rhs));
-        match (maybe_in, maybe_out, lhs.is_active_thread, rhs.is_active_thread) {
+        match (
+            maybe_in,
+            maybe_out,
+            lhs.is_active_thread,
+            rhs.is_active_thread,
+        ) {
             (true, false, true, _) => std::cmp::Ordering::Less,
             (false, true, _, true) => std::cmp::Ordering::Greater,
             _ if lhs_cost < rhs_cost => std::cmp::Ordering::Less,
             _ if lhs_cost > rhs_cost => std::cmp::Ordering::Greater,
             _ if lhs.id < rhs.id => std::cmp::Ordering::Less,
             _ if lhs.id > rhs.id => std::cmp::Ordering::Greater,
-            _ => { panic!() }
+            _ => panic!(),
         }
     })
 }
@@ -358,14 +423,18 @@ fn dynamic_nesting(lhs: &ir::Dimension, rhs: &ir::Dimension, space: &SearchSpace
 mod tests {
     use super::*;
     use device::cuda::Gpu;
+    use env_logger;
     use helper;
     use ir;
-    use env_logger;
 
     /// Generates function with a load in two thread dimensions, with non-coalesced
     /// accessed on the first one.
-    fn gen_function<'a>(signature: &'a ir::Signature, gpu: &'a Gpu, d0_d1_order: Order)
-            -> (SearchSpace<'a>, ir::InstId, HashMap<ir::dim::Id, u32>) {
+    fn gen_function<'a>(
+        signature: &'a ir::Signature,
+        gpu: &'a Gpu,
+        d0_d1_order: Order,
+    ) -> (SearchSpace<'a>, ir::InstId, HashMap<ir::dim::Id, u32>)
+    {
         let mut builder = helper::Builder::new(&signature, gpu);
         let t = ir::Type::F(32);
         let size = builder.cst_size(gpu.wrap_size);
@@ -376,7 +445,7 @@ mod tests {
         let pattern = ir::AccessPattern::Tensor {
             mem_id: ir::mem::Id::External(0),
             stride: gpu.l1_cache_line as i32,
-            dims: vec![d0]
+            dims: vec![d0],
         };
         let ld = builder.ld_ex(t, &addr, pattern, InstFlag::MEM_CG);
         builder.order(&d0, &d1, d0_d1_order);
@@ -389,9 +458,12 @@ mod tests {
 
     /// Generates a dummy signature.
     fn gen_signature() -> ir::Signature {
-        ir::Signature { name: String::new(), params: vec![], mem_blocks: 1 }
+        ir::Signature {
+            name: String::new(),
+            params: vec![],
+            mem_blocks: 1,
+        }
     }
-
 
     /// Tests `MemInfo` for global loads without coalescing.
     #[test]
@@ -402,8 +474,8 @@ mod tests {
         let (space, inst, size_map) = gen_function(&base, &gpu, Order::OUTER);
         let inst = space.ir_instance().inst(inst);
         let inst_info = analyse(&space, &gpu, &inst, &size_map);
-        assert_eq!(inst_info.l1_coalescing, 1.0/gpu.wrap_size as f64);
-        assert_eq!(inst_info.l2_coalescing, 1.0/gpu.wrap_size as f64);
+        assert_eq!(inst_info.l1_coalescing, 1.0 / gpu.wrap_size as f64);
+        assert_eq!(inst_info.l2_coalescing, 1.0 / gpu.wrap_size as f64);
         assert_eq!(inst_info.replay_factor, 1.0);
     }
 

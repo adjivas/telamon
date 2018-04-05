@@ -2,9 +2,9 @@
 //! is read from the `Setting.toml` file if it exists. Some parameters can be overridden
 //! from the command line.
 use config;
-use std;
 use getopts;
 use itertools::Itertools;
+use std;
 
 /// Stores the configuration of the exploration.
 #[derive(Clone)]
@@ -21,9 +21,9 @@ pub struct Config {
     /// Indicates the search must be stopped after the given number of minutes.
     pub timeout: Option<u64>,
     /// A percentage cut
-    /// indicate that we only care to find a candidate that is in a certain range above the best
-    /// Therefore, if cut_under is 20%, we can discard any candidate whose bound is above 80% of
-    /// the current best 
+    /// indicate that we only care to find a candidate that is in a certain range above
+    /// the best Therefore, if cut_under is 20%, we can discard any candidate whose
+    /// bound is above 80% of the current best
     pub distance_to_best: Option<f64>,
 }
 
@@ -33,7 +33,10 @@ impl Config {
         let arg_parser = Self::setup_args_parser();
         let args = std::env::args().collect_vec();
         let arg_matches = arg_parser.parse(&args[1..]).unwrap_or_else(|err| {
-            println!("{} Use '--help' to display a list of valid options.", err);
+            println!(
+                "{} Use '--help' to display a list of valid options.",
+                err
+            );
             std::process::exit(-1);
         });
         if arg_matches.opt_present("h") {
@@ -75,7 +78,12 @@ impl Config {
     fn setup_args_parser() -> getopts::Options {
         let mut opts = getopts::Options::new();
         opts.optflag("h", "help", "Print the help menu.");
-        opts.optopt("j", "jobs", "number of explorer working in parallel", "N_THREAD");
+        opts.optopt(
+            "j",
+            "jobs",
+            "number of explorer working in parallel",
+            "N_THREAD",
+        );
         opts.optopt("f", "log_file", "name of watcher file", "string");
         SearchAlgorithm::setup_args_parser(&mut opts);
         opts
@@ -109,8 +117,12 @@ impl std::fmt::Display for Config {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         writeln!(f, "log_file = \"{}\"", self.log_file)?;
         writeln!(f, "num_workers = {}", self.num_workers)?;
-        if let Some(b) = self.stop_bound { writeln!(f, "stop_bound = {}", b)?; }
-        if let Some(b) = self.timeout { writeln!(f, "timeout = {}", b)?; }
+        if let Some(b) = self.stop_bound {
+            writeln!(f, "stop_bound = {}", b)?;
+        }
+        if let Some(b) = self.timeout {
+            writeln!(f, "timeout = {}", b)?;
+        }
         self.algorithm.fmt(f)?;
         Ok(())
     }
@@ -128,8 +140,12 @@ pub enum SearchAlgorithm {
 impl SearchAlgorithm {
     /// Sets up the options that can be passed on the command line.
     fn setup_args_parser(opts: &mut getopts::Options) {
-        opts.optopt("a", "algorithm", "exploration algorithm: bound_order or bandit",
-                    "bound_order:bandit");
+        opts.optopt(
+            "a",
+            "algorithm",
+            "exploration algorithm: bound_order or bandit",
+            "bound_order:bandit",
+        );
         BanditConfig::setup_args_parser(opts);
     }
 
@@ -154,9 +170,11 @@ impl SearchAlgorithm {
             "bandit" => {
                 let bandit_config = BanditConfig::parse_config(parser);
                 SearchAlgorithm::MultiArmedBandit(bandit_config)
-            },
-            algo => panic!("invalid search algorithm: {}. \
-                           Must be algorithm=bound_order|bandit", algo),
+            }
+            algo => panic!(
+                "invalid search algorithm: {}. Must be algorithm=bound_order|bandit",
+                algo
+            ),
         }
     }
 }
@@ -168,7 +186,7 @@ impl std::fmt::Display for SearchAlgorithm {
             SearchAlgorithm::MultiArmedBandit(ref config) => {
                 writeln!(f, "algorithm = \"bandit\"")?;
                 config.fmt(f)
-            },
+            }
         }
     }
 }
@@ -186,18 +204,21 @@ pub struct BanditConfig {
     /// The biggest delta is, the more focused on the previous best candidates the
     /// exploration is.
     pub delta: f64,
-    /// If true, does not expand tree until end - instead, starts a montecarlo descend after each
-    /// expansion of a node
+    /// If true, does not expand tree until end - instead, starts a montecarlo descend
+    /// after each expansion of a node
     pub monte_carlo: bool,
 }
 
 impl BanditConfig {
     /// Sets up the options that can be passed on the command line.
     fn setup_args_parser(opts: &mut getopts::Options) {
-        opts.optopt("s", "default_node_selection",
-                    "selection algorithm for nodes without evaluations: \
-                    api, random, bound, weighted_random",
-                    "api|random|bound|weighted_random");
+        opts.optopt(
+            "s",
+            "default_node_selection",
+            "selection algorithm for nodes without evaluations: api, random, bound, \
+             weighted_random",
+            "api|random|bound|weighted_random",
+        );
     }
 
     /// Overwrite the configuration with the parameters from the command line.
@@ -267,8 +288,10 @@ impl NewNodeOrder {
             "random" => NewNodeOrder::Random,
             "bound" => NewNodeOrder::Bound,
             "weighted_random" => NewNodeOrder::WeightedRandom,
-            _ => panic!("Wrong new_nodes_order option, \
-                       must be new_nodes_order = api|random|bound|weighted_random")
+            _ => panic!(
+                "Wrong new_nodes_order option, must be new_nodes_order = \
+                 api|random|bound|weighted_random"
+            ),
         }
     }
 }
@@ -309,8 +332,10 @@ impl OldNodeOrder {
             "bandit" => OldNodeOrder::Bandit,
             "bound" => OldNodeOrder::Bound,
             "weighted_random" => OldNodeOrder::WeightedRandom,
-            _ =>  panic!("Wrong old_nodes_order option, \
-                         must be old_nodes_order = bound|bandit|weighted_random")
+            _ => panic!(
+                "Wrong old_nodes_order option, must be old_nodes_order = \
+                 bound|bandit|weighted_random"
+            ),
         }
     }
 }

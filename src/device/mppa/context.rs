@@ -40,8 +40,11 @@ impl<'a> Context<'a> {
     }
 
     /// Compiles and sets the arguments of a kernel.
-    fn setup_kernel<'b>(&self, fun: &device::Function<'a, 'b>)
-            -> (telajax::Kernel, telajax::Mem) {
+    fn setup_kernel<'b>(
+        &self,
+        fun: &device::Function<'a, 'b>,
+    ) -> (telajax::Kernel, telajax::Mem)
+    {
         let mut code: Vec<u8> = Vec::new();
         let wrapper = self.get_wrapper(fun.signature());
         mppa::printer::print(fun, true, &mut code).unwrap();
@@ -49,12 +52,16 @@ impl<'a> Context<'a> {
         debug!("{}", code.clone().into_string().unwrap()); // DEBUG
         let cflags = std::ffi::CString::new("").unwrap();
         let lflags = std::ffi::CString::new("").unwrap();
-        let mut kernel = self.executor.build_kernel(&code, &cflags, &lflags, &*wrapper);
+        let mut kernel = self.executor
+            .build_kernel(&code, &cflags, &lflags, &*wrapper);
         kernel.set_num_clusters(1);
-        let (mut arg_sizes, mut args): (Vec<_>, Vec<_>) = fun.params.iter().map(|p| {
-            let arg = self.get_param(&p.name);
-            (arg.size_of(), arg.raw_ptr())
-        }).unzip();
+        let (mut arg_sizes, mut args): (Vec<_>, Vec<_>) = fun.params
+            .iter()
+            .map(|p| {
+                let arg = self.get_param(&p.name);
+                (arg.size_of(), arg.raw_ptr())
+            })
+            .unzip();
         let out_mem = self.writeback_slots.pop();
         arg_sizes.push(std::mem::size_of::<*mut libc::c_void>());
         args.push(out_mem.raw_ptr());
@@ -89,7 +96,11 @@ impl<'a> device::Context<'a> for Context<'a> {
 
     fn allocate_array(&mut self, id: ir::mem::Id, size: usize) -> Box<device::Argument> {
         let mem = self.executor.alloc(size);
-        Box::new(Buffer { mem: mem, id: id, context: Default::default() })
+        Box::new(Buffer {
+            mem,
+            id,
+            context: Default::default(),
+        })
     }
 
     fn evaluate(&self, fun: &device::Function) -> f64 {
@@ -105,22 +116,33 @@ impl<'a> device::Context<'a> for Context<'a> {
         0.0 // FIXME: bound the execution time
     }
 
-    fn async_eval<'b, 'c>(&'c self, callback: &'c device::AsyncCallback<'b, 'c>,
-                          inner: &mut FnMut(&device::AsyncEvaluator<'b>)) {
+    fn async_eval<'b, 'c>(
+        &'c self,
+        callback: &'c device::AsyncCallback<'b, 'c>,
+        inner: &mut FnMut(&device::AsyncEvaluator<'b>),
+    )
+    {
         // FIXME: execute in parallel
-        let evaluator = AsyncEvaluator { context: self, callback: callback };
+        let evaluator = AsyncEvaluator {
+            context: self,
+            callback,
+        };
         inner(&evaluator);
         self.executor.wait_all();
     }
 }
 
 /// Asynchronous evaluator.
-struct AsyncEvaluator<'a, 'b> where 'a: 'b {
+struct AsyncEvaluator<'a, 'b>
+where 'a: 'b
+{
     context: &'b Context<'b>,
     callback: &'b device::AsyncCallback<'a, 'b>,
 }
 
-impl<'a, 'b> device::AsyncEvaluator<'a> for AsyncEvaluator<'a, 'b> where 'a:'b {
+impl<'a, 'b> device::AsyncEvaluator<'a> for AsyncEvaluator<'a, 'b>
+where 'a: 'b
+{
     fn add_kernel(&self, candidate: explorer::Candidate<'a>) {
         let (kernel, out_mem) = {
             let dev_fun = device::Function::build(&candidate.space);
@@ -128,16 +150,19 @@ impl<'a, 'b> device::AsyncEvaluator<'a> for AsyncEvaluator<'a, 'b> where 'a:'b {
         };
         let kernel_event = self.context.executor.enqueue_kernel(&kernel);
         let mut t = vec![0u64];
-        let read_event = self.context.executor.async_read_buffer(
-            &out_mem, &mut t, &[kernel_event]);
+        let read_event =
+            self.context
+                .executor
+                .async_read_buffer(&out_mem, &mut t, &[kernel_event]);
         let callback = move || {
             self.context.writeback_slots.push(out_mem);
             (self.callback)(candidate, t[0] as f64);
         };
-        self.context.executor.set_event_callback(&read_event, callback);
+        self.context
+            .executor
+            .set_event_callback(&read_event, callback);
     }
 }
-
 
 /// Buffer in MPPA RAM.
 pub struct Buffer<'a> {

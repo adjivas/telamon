@@ -19,28 +19,28 @@ impl Executor {
     pub fn init() -> Executor {
         // The daemon must be spawned before init_cuda is called.
         let _ = unwrap!(JIT_SPAWNER.lock());
-        Executor { context: unsafe { init_cuda(0) } }
+        Executor {
+            context: unsafe { init_cuda(0) },
+        }
     }
 
     /// Spawns a `JITDaemon`.
-    pub fn spawn_jit(&self) -> JITDaemon {
-        unwrap!(JIT_SPAWNER.lock()).spawn_jit()
-    }
+    pub fn spawn_jit(&self) -> JITDaemon { unwrap!(JIT_SPAWNER.lock()).spawn_jit() }
 
     /// Compiles a PTX module.
     pub fn compile_ptx<'a>(&'a self, code: &str) -> Module<'a> {
-        Module::new(unsafe { &*self.context as &'a _}, code)
+        Module::new(unsafe { &*self.context as &'a _ }, code)
     }
 
     /// Compiles a PTX module using a separate process.
     pub fn compile_remote<'a>(&'a self, jit: &mut JITDaemon, code: &str) -> Module<'a> {
         debug!("IN COMPILE REMOTE");
-        jit.compile(unsafe { &*self.context as &'a _}, code)
+        jit.compile(unsafe { &*self.context as &'a _ }, code)
     }
 
     /// Allocates an array on the CUDA device.
     pub fn allocate_array<T>(&self, len: usize) -> Array<T> {
-        let context = unsafe { &*self.context as &_};
+        let context = unsafe { &*self.context as &_ };
         Array::new(context, len)
     }
 
@@ -55,9 +55,12 @@ impl Executor {
     }
 
     /// Creates a new set of performance counters.
-    pub fn create_perf_counter_set<'a>(&'a self, counters: &[PerfCounter]
-                                      ) -> PerfCounterSet<'a> {
-        PerfCounterSet::new(unsafe { &*self.context as &'a _}, counters)
+    pub fn create_perf_counter_set<'a>(
+        &'a self,
+        counters: &[PerfCounter],
+    ) -> PerfCounterSet<'a>
+    {
+        PerfCounterSet::new(unsafe { &*self.context as &'a _ }, counters)
     }
 
     /// Returns the value of a CUDA device attribute.
@@ -68,7 +71,9 @@ impl Executor {
 
 impl Drop for Executor {
     fn drop(&mut self) {
-        unsafe { free_cuda(self.context); }
+        unsafe {
+            free_cuda(self.context);
+        }
     }
 }
 

@@ -1,9 +1,9 @@
 //! Describes a `Function` that is ready to execute on a device.
+use codegen::{cfg, dimension, Cfg, Dimension, InductionLevel, InductionVar};
 use ir;
 use ir::prelude::*;
 use itertools::Itertools;
 use search_space::{self, DimKind, Domain, MemSpace, SearchSpace};
-use codegen::{cfg, Cfg, dimension, Dimension, InductionVar, InductionLevel};
 use std;
 
 /// A function ready to execute on a device, derived from a constrained IR instance.
@@ -25,22 +25,41 @@ impl<'a> Function<'a> {
         let (induction_vars, precomputed_indvar_levels) =
             dimension::register_induction_vars(&mut dims, space);
         trace!("dims = {:?}", dims);
-        let insts = space.ir_instance().insts()
-            .map(|inst| Instruction::new(inst, space)).collect_vec();
-        let device_code_args = dims.iter().flat_map(|d| d.host_values(space))
-            .chain(induction_vars.iter().flat_map(|v| v.host_values(space)))
-            .chain(insts.iter().flat_map(|i| i.host_values(space)))
-            .chain(precomputed_indvar_levels.iter().flat_map(|l| l.host_values(space)))
+        let insts = space
+            .ir_instance()
+            .insts()
+            .map(|inst| Instruction::new(inst, space))
             .collect_vec();
-        let (block_dims, thread_dims, cfg) = cfg::build(
-            space, insts, dims, precomputed_indvar_levels);
+        let device_code_args = dims.iter()
+            .flat_map(|d| d.host_values(space))
+            .chain(
+                induction_vars
+                    .iter()
+                    .flat_map(|v| v.host_values(space)),
+            )
+            .chain(insts.iter().flat_map(|i| i.host_values(space)))
+            .chain(
+                precomputed_indvar_levels
+                    .iter()
+                    .flat_map(|l| l.host_values(space)),
+            )
+            .collect_vec();
+        let (block_dims, thread_dims, cfg) =
+            cfg::build(space, insts, dims, precomputed_indvar_levels);
         let mem_blocks = register_mem_blocks(space, &block_dims);
-        let device_code_args = device_code_args.into_iter()
+        let device_code_args = device_code_args
+            .into_iter()
             .chain(mem_blocks.iter().flat_map(|x| x.host_values(space)))
-            .unique_by(|x| x.key()).collect();
+            .unique_by(|x| x.key())
+            .collect();
         debug!("compiling cfg {:?}", cfg);
         Function {
-            cfg, thread_dims, block_dims, induction_vars, device_code_args, space,
+            cfg,
+            thread_dims,
+            block_dims,
+            induction_vars,
+            device_code_args,
+            space,
             mem_blocks,
         }
     }
@@ -52,8 +71,11 @@ impl<'a> Function<'a> {
     pub fn block_dims(&self) -> &[Dimension<'a>] { &self.block_dims }
 
     /// Iterates other all `codegen::Dimension`.
-    pub fn dimensions(&self) -> impl Iterator<Item=&Dimension> {
-        self.cfg.dimensions().chain(&self.block_dims).chain(&self.thread_dims)
+    pub fn dimensions(&self) -> impl Iterator<Item = &Dimension> {
+        self.cfg
+            .dimensions()
+            .chain(&self.block_dims)
+            .chain(&self.thread_dims)
     }
 
     /// Returns the list of induction variables.
@@ -61,11 +83,14 @@ impl<'a> Function<'a> {
 
     /// Returns the total number of threads to allocate.
     pub fn num_threads(&self) -> u32 {
-        self.thread_dims.iter().map(|d| unwrap!(d.size().as_int())).product()
+        self.thread_dims
+            .iter()
+            .map(|d| unwrap!(d.size().as_int()))
+            .product()
     }
 
     /// Returns the values to pass from the host to the device.
-    pub fn device_code_args(&self) -> impl Iterator<Item=&ParamVal<'a>> {
+    pub fn device_code_args(&self) -> impl Iterator<Item = &ParamVal<'a>> {
         self.device_code_args.iter()
     }
 
@@ -73,13 +98,14 @@ impl<'a> Function<'a> {
     pub fn cfg(&self) -> &Cfg<'a> { &self.cfg }
 
     /// Returns all the induction levels in the function.
-    pub fn induction_levels(&self) -> impl Iterator<Item=&InductionLevel> {
-        self.dimensions().flat_map(|d| d.induction_levels())
+    pub fn induction_levels(&self) -> impl Iterator<Item = &InductionLevel> {
+        self.dimensions()
+            .flat_map(|d| d.induction_levels())
             .chain(self.cfg.induction_levels())
     }
 
     /// Returns the memory blocks allocated by the function.
-    pub fn mem_blocks(&self) -> impl Iterator<Item=&InternalMemBlock> {
+    pub fn mem_blocks(&self) -> impl Iterator<Item = &InternalMemBlock> {
         self.mem_blocks.iter()
     }
 
@@ -106,7 +132,11 @@ pub enum ParamVal<'a> {
 
 impl<'a> ParamVal<'a> {
     /// Builds the `ParamVal` needed to implement an operand, if any.
-    pub fn from_operand(operand: &'a ir::Operand<'a>, space: &SearchSpace) -> Option<Self> {
+    pub fn from_operand(
+        operand: &'a ir::Operand<'a>,
+        space: &SearchSpace,
+    ) -> Option<Self>
+    {
         match *operand {
             ir::Operand::Param(p) => {
                 let t = unwrap!(space.ir_instance().device().lower_type(p.t, space));
@@ -121,8 +151,9 @@ impl<'a> ParamVal<'a> {
     pub fn from_size(size: &'a ir::Size) -> Option<Self> {
         match *size.dividend() {
             [] => None,
-            [p] if size.factor() == 1 && size.divisor() == 1 =>
-                Some(ParamVal::External(p, ir::Type::I(32))),
+            [p] if size.factor() == 1 && size.divisor() == 1 => {
+                Some(ParamVal::External(p, ir::Type::I(32)))
+            }
             _ => Some(ParamVal::Size(size)),
         }
     }
@@ -164,18 +195,24 @@ pub enum ParamValKey<'a> {
 
 /// Generates the list of internal memory blocks, and creates the parameters needed to
 /// back them.
-fn register_mem_blocks<'a>(space: &'a SearchSpace<'a>, block_dims: &[Dimension<'a>])
-    -> Vec<InternalMemBlock<'a>>
+fn register_mem_blocks<'a>(
+    space: &'a SearchSpace<'a>,
+    block_dims: &[Dimension<'a>],
+) -> Vec<InternalMemBlock<'a>>
 {
     let num_thread_blocks = block_dims.iter().fold(None, |pred, block| {
         if let Some(mut pred) = pred {
             pred *= block.size();
             Some(pred)
-        } else { Some(block.size().clone()) }
+        } else {
+            Some(block.size().clone())
+        }
     });
-    space.ir_instance().internal_mem_blocks().map(|b| {
-        InternalMemBlock::new(b, &num_thread_blocks, space)
-    }).collect()
+    space
+        .ir_instance()
+        .internal_mem_blocks()
+        .map(|b| InternalMemBlock::new(b, &num_thread_blocks, space))
+        .collect()
 }
 
 /// A memory block allocated by the kernel.
@@ -189,34 +226,58 @@ pub struct InternalMemBlock<'a> {
 
 /// Indicates how is a memory block allocated.
 #[derive(PartialEq, Eq)]
-pub enum AllocationScheme { Global, PrivatisedGlobal, Shared }
+pub enum AllocationScheme {
+    Global,
+    PrivatisedGlobal,
+    Shared,
+}
 
 impl<'a> InternalMemBlock<'a> {
     /// Creates a new InternalMemBlock from an `ir::mem::Internal`.
-    pub fn new(block: &'a ir::mem::InternalBlock<'a>,
-           num_threads_groups: &Option<ir::Size<'a>>,
-           space: &'a SearchSpace<'a>) -> Self {
+    pub fn new(
+        block: &'a ir::mem::InternalBlock<'a>,
+        num_threads_groups: &Option<ir::Size<'a>>,
+        space: &'a SearchSpace<'a>,
+    ) -> Self
+    {
         let mem_space = space.domain().get_mem_space(block.mem_id());
         assert!(mem_space.is_constrained());
         let size = block.size();
         let num_private_copies = if block.is_private() && mem_space == MemSpace::GLOBAL {
             num_threads_groups.clone()
-        } else { None };
+        } else {
+            None
+        };
         let ptr_type = ir::Type::PtrTo(block.id().into());
-        let ptr_type = unwrap!(space.ir_instance().device().lower_type(ptr_type, space));
-        InternalMemBlock { id: block.id(), size, mem_space, num_private_copies, ptr_type }
+        let ptr_type = unwrap!(
+            space
+                .ir_instance()
+                .device()
+                .lower_type(ptr_type, space)
+        );
+        InternalMemBlock {
+            id: block.id(),
+            size,
+            mem_space,
+            num_private_copies,
+            ptr_type,
+        }
     }
 
     /// Returns the value to pass from the host to the device to implement `self`.
-    pub fn host_values(&self, space: &SearchSpace) -> impl Iterator<Item=ParamVal<'a>> {
+    pub fn host_values(&self, space: &SearchSpace) -> impl Iterator<Item = ParamVal<'a>> {
         let ptr = if self.mem_space == MemSpace::GLOBAL {
             let t = ir::Type::PtrTo(self.id.into());
             let t = unwrap!(space.ir_instance().device().lower_type(t, space));
             Some(ParamVal::GlobalMem(self.id, self.alloc_size(), t))
-        } else { None };
+        } else {
+            None
+        };
         let size = if self.num_private_copies.is_some() {
             Some(ParamVal::Size(self.size))
-        } else { None };
+        } else {
+            None
+        };
         ptr.into_iter().chain(size)
     }
 
@@ -227,8 +288,9 @@ impl<'a> InternalMemBlock<'a> {
     pub fn alloc_scheme(&self) -> AllocationScheme {
         match self.mem_space {
             MemSpace::SHARED => AllocationScheme::Shared,
-            MemSpace::GLOBAL if self.num_private_copies.is_some() =>
-                AllocationScheme::PrivatisedGlobal,
+            MemSpace::GLOBAL if self.num_private_copies.is_some() => {
+                AllocationScheme::PrivatisedGlobal
+            }
             MemSpace::GLOBAL => AllocationScheme::Global,
             _ => unreachable!(),
         }
@@ -237,7 +299,9 @@ impl<'a> InternalMemBlock<'a> {
     /// Generates the size of the memory to allocate.
     pub fn alloc_size(&self) -> ir::Size<'a> {
         let mut out = self.size.clone();
-        if let Some(ref s) = self.num_private_copies { out *= s }
+        if let Some(ref s) = self.num_private_copies {
+            out *= s
+        }
         out
     }
 
@@ -262,27 +326,50 @@ pub struct Instruction<'a> {
 impl<'a> Instruction<'a> {
     /// Creates a new `Instruction`.
     pub fn new(instruction: &'a ir::Instruction<'a>, space: &SearchSpace) -> Self {
-        let instantiation_dims = instruction.iteration_dims().iter().filter(|&&dim| {
-            let kind = space.domain().get_dim_kind(dim);
-            unwrap!(kind.is(DimKind::VECTOR | DimKind::UNROLL).as_bool())
-        }).map(|&dim| {
-            (dim, unwrap!(space.ir_instance().dim(dim).size().as_int()))
-        }).collect();
-        let mem_flag = instruction.as_mem_inst()
+        let instantiation_dims = instruction
+            .iteration_dims()
+            .iter()
+            .filter(|&&dim| {
+                let kind = space.domain().get_dim_kind(dim);
+                unwrap!(kind.is(DimKind::VECTOR | DimKind::UNROLL).as_bool())
+            })
+            .map(|&dim| {
+                (
+                    dim,
+                    unwrap!(space.ir_instance().dim(dim).size().as_int()),
+                )
+            })
+            .collect();
+        let mem_flag = instruction
+            .as_mem_inst()
             .map(|inst| space.domain().get_inst_flag(inst.id()));
-        let t = unwrap!(space.ir_instance().device().lower_type(instruction.t(), space));
-        Instruction { instruction, instantiation_dims, mem_flag, t }
+        let t = unwrap!(
+            space
+                .ir_instance()
+                .device()
+                .lower_type(instruction.t(), space)
+        );
+        Instruction {
+            instruction,
+            instantiation_dims,
+            mem_flag,
+            t,
+        }
     }
 
     /// Returns the ID of the instruction.
     pub fn id(&self) -> ir::InstId { self.instruction.id() }
 
     /// Returns the values to pass from the host to implement this instruction.
-    pub fn host_values(&self, space: &'a SearchSpace<'a>)
-        -> impl Iterator<Item=ParamVal<'a>>
+    pub fn host_values(
+        &self,
+        space: &'a SearchSpace<'a>,
+    ) -> impl Iterator<Item = ParamVal<'a>>
     {
         let operands = self.instruction.operator().operands();
-        operands.into_iter().flat_map(move |op| ParamVal::from_operand(op, space))
+        operands
+            .into_iter()
+            .flat_map(move |op| ParamVal::from_operand(op, space))
     }
 
     /// Returns the type of the instruction.
@@ -298,7 +385,9 @@ impl<'a> Instruction<'a> {
     /// instruction that initializes the reduction, the `DimMap` to readh it and the
     /// reduction dimensions.
     pub fn as_reduction(&self) -> Option<(ir::InstId, &ir::DimMap)> {
-        self.instruction.as_reduction().map(|(x, y, _)| (x, y))
+        self.instruction
+            .as_reduction()
+            .map(|(x, y, _)| (x, y))
     }
 
     /// Returns the memory flag of the intruction, if any.

@@ -15,7 +15,7 @@ impl device::Device for MPPA {
     fn is_valid_type(&self, t: &ir::Type) -> bool {
         match *t {
             ir::Type::Void | ir::Type::PtrTo(..) => true,
-            ir::Type::F(x) => x == 16 || x ==32 || x == 64,
+            ir::Type::F(x) => x == 16 || x == 32 || x == 64,
             ir::Type::I(x) => x == 8 || x == 16 || x == 32 || x == 64,
         }
     }

@@ -1,14 +1,12 @@
 //! Exploration of the search space.
+use data_structure_traits::Create;
 use device::Context;
 use explorer::choice::ActionEx;
 use immut_list::ImmutList;
-use data_structure_traits::Create;
+use itertools::Itertools;
 use model::{bound, Bound};
 use search_space::SearchSpace;
 use std::cmp::{Ordering, PartialOrd};
-
-use itertools::Itertools;
-
 
 /// A node of the search tree.
 pub struct Candidate<'a> {
@@ -25,37 +23,66 @@ pub struct Candidate<'a> {
 impl<'a> Candidate<'a> {
     /// Creates a new candidate, with depth 0.
     pub fn new(space: SearchSpace<'a>, bound: Bound) -> Self {
-        Candidate { space, bound, depth: 0, actions: ImmutList::new() }
+        Candidate {
+            space,
+            bound,
+            depth: 0,
+            actions: ImmutList::new(),
+        }
     }
 
-
-    pub fn apply_choice(&self, context: &Context, choice: Vec<ActionEx>) -> Vec<Candidate<'a>> {
-        let res = choice.into_iter().flat_map(|action| {
-            self.apply_decision(context, action)
-                .map_err(|_| trace!("invalid action encountered")).ok()
-        }).collect_vec();
-        if res.is_empty() { info!("deadend encountered in the search space"); }
+    pub fn apply_choice(
+        &self,
+        context: &Context,
+        choice: Vec<ActionEx>,
+    ) -> Vec<Candidate<'a>>
+    {
+        let res = choice
+            .into_iter()
+            .flat_map(|action| {
+                self.apply_decision(context, action)
+                    .map_err(|_| trace!("invalid action encountered"))
+                    .ok()
+            })
+            .collect_vec();
+        if res.is_empty() {
+            info!("deadend encountered in the search space");
+        }
         res
     }
 
-
     /// Applies a choice to a candidate.
-    pub fn apply_decision(&self, context: &Context, action: ActionEx) -> Result<Self, ()> {
+    pub fn apply_decision(
+        &self,
+        context: &Context,
+        action: ActionEx,
+    ) -> Result<Self, ()>
+    {
         debug!("applying action {:?}", action);
         let mut space = self.space.clone();
         match action {
             ActionEx::Action(action) => space.apply_decisions(vec![action]),
-            ActionEx::LowerLayout { mem, ref st_dims, ref ld_dims } =>
-                space.lower_layout(mem, st_dims.clone(), ld_dims.clone()),
+            ActionEx::LowerLayout {
+                mem,
+                ref st_dims,
+                ref ld_dims,
+            } => space.lower_layout(mem, st_dims.clone(), ld_dims.clone()),
         }?;
         let bound = bound(&space, context);
         let delta = 1.0e-2 * self.bound.value();
         if bound.value() + delta < self.bound.value() {
-            debug!("decreasing bound: {} > {}, with actions {:?} when applying {:?}",
-                   self.bound, bound, self.actions, action);
+            debug!(
+                "decreasing bound: {} > {}, with actions {:?} when applying {:?}",
+                self.bound, bound, self.actions, action
+            );
         }
         let actions = self.actions.clone().add_element(action);
-        Ok(Candidate { space, bound, depth: self.depth+1, actions })
+        Ok(Candidate {
+            space,
+            bound,
+            depth: self.depth + 1,
+            actions,
+        })
     }
 }
 

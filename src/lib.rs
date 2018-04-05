@@ -4,14 +4,14 @@ extern crate crossbeam;
 extern crate data_structure_traits;
 #[cfg(test)]
 extern crate env_logger;
-extern crate getopts;
 extern crate errno;
-extern crate interval_heap;
+extern crate getopts;
 extern crate immut_list;
-extern crate itertools;
-#[cfg(feature="cuda")]
+extern crate interval_heap;
+#[cfg(feature = "cuda")]
 extern crate ipc_channel;
-#[cfg(feature="cuda")]
+extern crate itertools;
+#[cfg(feature = "cuda")]
 #[macro_use]
 extern crate lazy_static;
 extern crate libc;
@@ -20,16 +20,16 @@ extern crate linked_list;
 extern crate log;
 #[macro_use]
 extern crate matches;
+extern crate futures;
 extern crate num;
-#[cfg(feature="mppa")]
+#[cfg(feature = "mppa")]
 extern crate parking_lot;
-#[cfg(feature="cuda")]
+#[cfg(feature = "cuda")]
 extern crate prctl;
 extern crate rand;
-extern crate futures;
-extern crate tokio_timer;
-#[cfg(feature="cuda")]
+#[cfg(feature = "cuda")]
 extern crate rustc_serialize;
+extern crate tokio_timer;
 #[macro_use]
 extern crate telamon_utils as utils;
 

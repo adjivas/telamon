@@ -1,12 +1,12 @@
 //! Describes CUDA-enabled GPUs.
-use device::{self, Device};
 use codegen::Function;
-use device::cuda::printer as p;
+use device::{self, Device};
 use device::cuda::mem_model::{self, MemInfo};
+use device::cuda::printer as p;
 use ir::{self, Type};
 use model::{self, HwPressure};
-use search_space::{DimKind, Domain, InstFlag, MemSpace, SearchSpace};
 use rustc_serialize::json;
+use search_space::{DimKind, Domain, InstFlag, MemSpace, SearchSpace};
 use std;
 use std::fs::File;
 use std::io::{Read, Write};
@@ -41,7 +41,7 @@ impl InstDesc {
             alu: self.alu * ratio,
             sync: self.sync * ratio,
             mem: self.mem * ratio,
-            .. self
+            ..self
         }
     }
 }
@@ -155,14 +155,12 @@ impl Gpu {
     }
 
     /// Returns the PTX code for a Function.
-    pub fn print_ptx(&self, fun: &Function) -> String {
-        p::function(fun, self)
-    }
+    pub fn print_ptx(&self, fun: &Function) -> String { p::function(fun, self) }
 
     /// Returns the ratio of threads actually used per wrap.
     fn wrap_use_ratio(&self, max_num_threads: u64) -> f64 {
         let wrap_size = u64::from(self.wrap_size);
-        let n_wraps = (max_num_threads + wrap_size - 1)/wrap_size;
+        let n_wraps = (max_num_threads + wrap_size - 1) / wrap_size;
         max_num_threads as f64 / (n_wraps * wrap_size) as f64
     }
 
@@ -172,26 +170,35 @@ impl Gpu {
         assert!(InstFlag::MEM_COHERENT.contains(flags));
         // Compute possible latencies.
         let gbl_latency = if flags.intersects(InstFlag::MEM_GLOBAL) {
-            let miss = mem_info.l2_miss_ratio/mem_info.l2_coalescing;
-            miss*self.load_ram_latency + (1.0-miss)*self.load_l2_latency
-        } else { std::f64::INFINITY };
+            let miss = mem_info.l2_miss_ratio / mem_info.l2_coalescing;
+            miss * self.load_ram_latency + (1.0 - miss) * self.load_l2_latency
+        } else {
+            std::f64::INFINITY
+        };
         let shared_latency = if flags.intersects(InstFlag::MEM_SHARED) {
             self.load_shared_latency as f64
-        } else { std::f64::INFINITY };
+        } else {
+            std::f64::INFINITY
+        };
         // Compute the smx bandwidth used.
         let l1_lines_from_l2 = if flags.intersects(InstFlag::MEM_SHARED) {
             0.0
-        } else { mem_info.l1_coalescing };
+        } else {
+            mem_info.l1_coalescing
+        };
         let l2_lines_from_l2 = if flags.intersects(InstFlag::MEM_SHARED) {
             0.0
-        } else { mem_info.l2_coalescing };
+        } else {
+            mem_info.l2_coalescing
+        };
         InstDesc {
             latency: f64::min(gbl_latency, shared_latency),
             issue: mem_info.replay_factor,
             mem: mem_info.replay_factor,
-            l1_lines_from_l2, l2_lines_from_l2,
+            l1_lines_from_l2,
+            l2_lines_from_l2,
             ram_bw: mem_info.l2_miss_ratio * f64::from(self.l2_cache_line),
-            .. InstDesc::default()
+            ..InstDesc::default()
         }
     }
 
@@ -202,14 +209,16 @@ impl Gpu {
         assert!(InstFlag::MEM_COHERENT.contains(flags));
         let l2_lines_from_l2 = if flags.intersects(InstFlag::MEM_SHARED) {
             0.0
-        } else { mem_info.l2_coalescing };
+        } else {
+            mem_info.l2_coalescing
+        };
         // L1 lines per L2 is not limiting.
         InstDesc {
             issue: mem_info.replay_factor,
             mem: mem_info.replay_factor,
             l2_lines_from_l2,
             ram_bw: 2.0 * mem_info.l2_miss_ratio * f64::from(self.l2_cache_line),
-            .. InstDesc::default()
+            ..InstDesc::default()
         }
     }
 
@@ -224,48 +233,55 @@ impl Gpu {
             let mut pressure: HwPressure = self.syncthread_inst.into();
             pressure.repeat_parallel(f64::from(size));
             pressure
-        } else { HwPressure::zero(self) }
+        } else {
+            HwPressure::zero(self)
+        }
     }
 
     /// Retruns the overhead for a single instance of the instruction.
-    fn inst_pressure(&self, space: &SearchSpace,
-                         dim_sizes: &HashMap<ir::dim::Id, u32>,
-                         inst: &ir::Instruction) -> HwPressure {
+    fn inst_pressure(
+        &self,
+        space: &SearchSpace,
+        dim_sizes: &HashMap<ir::dim::Id, u32>,
+        inst: &ir::Instruction,
+    ) -> HwPressure
+    {
         use ir::Operator::*;
-        let t = self.lower_type(inst.t(), space).unwrap_or_else(|| inst.t());
+        let t = self.lower_type(inst.t(), space)
+            .unwrap_or_else(|| inst.t());
         match (inst.operator(), t) {
-            (&Add(..), Type::F(32)) |
-            (&Sub(..), Type::F(32)) => self.add_f32_inst.into(),
-            (&Add(..), Type::F(64)) |
-            (&Sub(..), Type::F(64)) => self.add_f64_inst.into(),
-            (&Add(..), Type::I(32)) |
-            (&Sub(..), Type::I(32)) => self.add_i32_inst.into(),
-            (&Add(..), Type::I(64)) |
-            (&Sub(..), Type::I(64)) => self.add_i64_inst.into(),
+            (&Add(..), Type::F(32)) | (&Sub(..), Type::F(32)) => self.add_f32_inst.into(),
+            (&Add(..), Type::F(64)) | (&Sub(..), Type::F(64)) => self.add_f64_inst.into(),
+            (&Add(..), Type::I(32)) | (&Sub(..), Type::I(32)) => self.add_i32_inst.into(),
+            (&Add(..), Type::I(64)) | (&Sub(..), Type::I(64)) => self.add_i64_inst.into(),
             (&Mul(..), Type::F(32)) => self.mul_f32_inst.into(),
             (&Mul(..), Type::F(64)) => self.mul_f64_inst.into(),
-            (&Mul(..), Type::I(32)) |
-            (&Mul(..), Type::PtrTo(_)) => self.mul_i32_inst.into(),
-            (&Mul(ref op, _, _, _), Type::I(64)) => {
-                let op_t = self.lower_type(op.t(), space).unwrap_or_else(|| op.t());
+            (&Mul(..), Type::I(32)) | (&Mul(..), Type::PtrTo(_)) => {
+                self.mul_i32_inst.into()
+            }
+            (&Mul(ref op, ..), Type::I(64)) => {
+                let op_t = self.lower_type(op.t(), space)
+                    .unwrap_or_else(|| op.t());
                 if op_t == Type::I(64) {
                     self.mul_i64_inst.into()
                 } else {
                     self.mul_wide_inst.into()
                 }
-            },
+            }
             (&Mad(..), Type::F(32)) => self.mad_f32_inst.into(),
             (&Mad(..), Type::F(64)) => self.mad_f64_inst.into(),
-            (&Mad(..), Type::I(32)) |
-            (&Mad(..), Type::PtrTo(_)) => self.mad_i32_inst.into(),
-            (&Mad(ref op, _, _, _), Type::I(64)) => {
-                let op_t = self.lower_type(op.t(), space).unwrap_or_else(|| op.t());
+            (&Mad(..), Type::I(32)) | (&Mad(..), Type::PtrTo(_)) => {
+                self.mad_i32_inst.into()
+            }
+            (&Mad(ref op, ..), Type::I(64)) => {
+                let op_t = self.lower_type(op.t(), space)
+                    .unwrap_or_else(|| op.t());
                 if op_t == Type::I(64) {
                     self.mad_i64_inst.into()
                 } else {
                     self.mad_wide_inst.into()
                 }
-            },
+            }
             (&Div(..), Type::F(32)) => self.div_f32_inst.into(),
             (&Div(..), Type::F(64)) => self.div_f64_inst.into(),
             (&Div(..), Type::I(32)) => self.div_i32_inst.into(),
@@ -274,14 +290,14 @@ impl Gpu {
                 let flag = space.domain().get_inst_flag(inst.id());
                 let mem_info = mem_model::analyse(space, self, inst, dim_sizes);
                 self.load_desc(&mem_info, flag).into()
-            },
+            }
             (&St(..), _) | (&TmpSt(..), _) => {
                 let flag = space.domain().get_inst_flag(inst.id());
                 let mem_info = mem_model::analyse(space, self, inst, dim_sizes);
                 self.store_desc(&mem_info, flag).into()
-            },
+            }
             // TODO(model): Instruction description for mov and cast.
-            (&Mov(..), _) | (&Cast(..), _) =>  HwPressure::zero(self),
+            (&Mov(..), _) | (&Cast(..), _) => HwPressure::zero(self),
             _ => panic!(),
         }
     }
@@ -289,16 +305,26 @@ impl Gpu {
     /// Computes the number of blocks that can fit in an smx.
     pub fn blocks_per_smx(&self, space: &SearchSpace) -> u32 {
         let mut block_per_smx = self.max_block_per_smx;
-        let num_thread = space.ir_instance().insts()
-            .map(|inst| space.domain().get_num_threads(inst.id()).min).max().unwrap_or(1);
-        min_assign(&mut block_per_smx, self.thread_per_smx/num_thread);
+        let num_thread = space
+            .ir_instance()
+            .insts()
+            .map(|inst| space.domain().get_num_threads(inst.id()).min)
+            .max()
+            .unwrap_or(1);
+        min_assign(&mut block_per_smx, self.thread_per_smx / num_thread);
         let shared_mem_used = space.domain().get_shared_mem_used().min;
         if shared_mem_used != 0 {
-            min_assign(&mut block_per_smx, self.shared_mem_per_smx/shared_mem_used);
+            min_assign(
+                &mut block_per_smx,
+                self.shared_mem_per_smx / shared_mem_used,
+            );
         }
-        assert!(block_per_smx > 0,
-                "not enough resources per block: shared mem used = {}, num threads = {}",
-                shared_mem_used, num_thread);
+        assert!(
+            block_per_smx > 0,
+            "not enough resources per block: shared mem used = {}, num threads = {}",
+            shared_mem_used,
+            num_thread
+        );
         block_per_smx
     }
 }
@@ -331,21 +357,23 @@ impl device::Device for Gpu {
 
     fn lower_type(&self, t: ir::Type, space: &SearchSpace) -> Option<ir::Type> {
         match t {
-            Type::PtrTo(mem_id) => {
-                match space.domain().get_mem_space(mem_id) {
-                    MemSpace::GLOBAL => Some(Type::I(self.addr_size)),
-                    MemSpace::SHARED => Some(Type::I(32)),
-                    _ => None,
-                }
+            Type::PtrTo(mem_id) => match space.domain().get_mem_space(mem_id) {
+                MemSpace::GLOBAL => Some(Type::I(self.addr_size)),
+                MemSpace::SHARED => Some(Type::I(32)),
+                _ => None,
             },
             _ => Some(t),
         }
     }
 
-    fn hw_pressure(&self, space: &SearchSpace,
-                   dim_sizes: &HashMap<ir::dim::Id, u32>,
-                   _nesting: &HashMap<ir::BBId, model::Nesting>,
-                   bb: &ir::BasicBlock) -> model::HwPressure {
+    fn hw_pressure(
+        &self,
+        space: &SearchSpace,
+        dim_sizes: &HashMap<ir::dim::Id, u32>,
+        _nesting: &HashMap<ir::BBId, model::Nesting>,
+        bb: &ir::BasicBlock,
+    ) -> model::HwPressure
+    {
         if let Some(inst) = bb.as_inst() {
             self.inst_pressure(space, dim_sizes, inst)
         } else {
@@ -359,32 +387,40 @@ impl device::Device for Gpu {
         if kind == DimKind::LOOP {
             let end_pressure = InstDesc {
                 latency: self.loop_end_latency,
-                .. InstDesc::default()
+                ..InstDesc::default()
             };
             (self.loop_iter_overhead.into(), end_pressure.into())
         } else if kind == DimKind::THREAD_X {
             (self.syncthread_inst.into(), HwPressure::zero(self))
-        } else { (HwPressure::zero(self), HwPressure::zero(self)) }
+        } else {
+            (HwPressure::zero(self), HwPressure::zero(self))
+        }
     }
 
     fn thread_rates(&self) -> HwPressure { self.thread_rates.into() }
 
     fn block_rates(&self, max_num_threads: u64) -> HwPressure {
-        self.smx_rates.apply_use_ratio(self.wrap_use_ratio(max_num_threads)).into()
+        self.smx_rates
+            .apply_use_ratio(self.wrap_use_ratio(max_num_threads))
+            .into()
     }
 
     fn total_rates(&self, max_num_threads: u64) -> HwPressure {
-        self.gpu_rates.apply_use_ratio(self.wrap_use_ratio(max_num_threads)).into()
+        self.gpu_rates
+            .apply_use_ratio(self.wrap_use_ratio(max_num_threads))
+            .into()
     }
 
     fn bottlenecks(&self) -> &[&'static str] {
-        &["issue",
-          "alu",
-          "syncthread",
-          "mem_units",
-          "l1_lines_from_l2",
-          "l2_lines_from_l2",
-          "bandwidth"]
+        &[
+            "issue",
+            "alu",
+            "syncthread",
+            "mem_units",
+            "l1_lines_from_l2",
+            "l2_lines_from_l2",
+            "bandwidth",
+        ]
     }
 
     fn block_parallelism(&self, space: &SearchSpace) -> u32 {
@@ -409,7 +445,11 @@ impl device::Device for Gpu {
 }
 
 /// Asigns min(lhs, rhs) to lhs.
-fn min_assign<T: std::cmp::Ord>(lhs: &mut T, rhs: T) { if rhs < *lhs { *lhs = rhs; } }
+fn min_assign<T: std::cmp::Ord>(lhs: &mut T, rhs: T) {
+    if rhs < *lhs {
+        *lhs = rhs;
+    }
+}
 
 // TODO(model): On the Quadro K4000:
 // * The Mul wide latency is unknown.

@@ -11,14 +11,14 @@ mod operator;
 mod size;
 mod types;
 
-pub use self::access_pattern::{Stride, AccessPattern};
-pub use self::basic_block::{BasicBlock, BBId};
+pub use self::access_pattern::{AccessPattern, Stride};
+pub use self::basic_block::{BBId, BasicBlock};
 pub use self::dim_map::DimMap;
 pub use self::dimension::Dimension;
-pub use self::function::{Function, Signature, Parameter};
-pub use self::instruction::{InstId, Instruction};
+pub use self::function::{Function, Parameter, Signature};
 pub use self::induction_var::{IndVarId, InductionVar};
-pub use self::operand::{Operand, DimMapScope};
+pub use self::instruction::{InstId, Instruction};
+pub use self::operand::{DimMapScope, Operand};
 pub use self::operator::Operator;
 pub use self::size::Size;
 pub use self::types::Type;
@@ -27,8 +27,8 @@ pub mod mem;
 
 /// Defines iteration dimensions properties.
 pub mod dim {
-    pub use super::dimension::Id;
     pub use super::dim_map::DimMap as Map;
+    pub use super::dimension::Id;
 }
 
 /// Defines operators.
@@ -59,7 +59,9 @@ impl NewObjs {
     /// Registers a new instruction.
     pub fn add_instruction(&mut self, inst: &Instruction) {
         self.add_bb(inst);
-        for &dim in inst.iteration_dims() { self.iteration_dims.push((inst.id(), dim)); }
+        for &dim in inst.iteration_dims() {
+            self.iteration_dims.push((inst.id(), dim));
+        }
         self.instructions.push(inst.id());
     }
 
@@ -76,9 +78,7 @@ impl NewObjs {
     }
 
     /// Registers a new basic block.
-    pub fn add_bb(&mut self, bb: &BasicBlock) {
-        self.basic_blocks.push(bb.bb_id());
-    }
+    pub fn add_bb(&mut self, bb: &BasicBlock) { self.basic_blocks.push(bb.bb_id()); }
 
     /// Sets a dimension as a new iteration dimension.
     pub fn add_iteration_dim(&mut self, inst: InstId, dim: dim::Id) {
@@ -97,7 +97,7 @@ pub struct LoweredDimMap {
     pub mem: mem::InternalId,
     pub store: InstId,
     pub load: InstId,
-    pub dimensions: Vec<(dim::Id, dim::Id)>
+    pub dimensions: Vec<(dim::Id, dim::Id)>,
 }
 
 // TODO(perf): group static computations

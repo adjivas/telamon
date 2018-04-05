@@ -6,17 +6,16 @@ mod gpu;
 mod mem_model;
 mod printer;
 
-pub use self::api::{Array, ArrayArg, Executor, PerfCounter, PerfCounterSet, JITDaemon};
+pub use self::api::{Array, ArrayArg, Executor, JITDaemon, PerfCounter, PerfCounterSet};
 pub use self::api::DeviceAttribute;
 pub use self::context::Context;
 pub use self::gpu::{Gpu, InstDesc};
 pub use self::kernel::Kernel;
-
 use codegen;
 use ir;
+use num::ToPrimitive;
 use num::bigint::BigInt;
 use num::rational::Ratio;
-use num::ToPrimitive;
 use std;
 use utils::*;
 
@@ -70,8 +69,8 @@ impl codegen::Namer for Namer {
             codegen::ParamValKey::GlobalMem(mem) => format!("_gbl_mem_{}", mem.0),
             codegen::ParamValKey::Size(_) => {
                 self.num_sizes += 1;
-                format!("_size_{}", self.num_sizes-1)
-            },
+                format!("_size_{}", self.num_sizes - 1)
+            }
         }
     }
 }

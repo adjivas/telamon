@@ -1,11 +1,10 @@
 //! Describes the context for which a function must be optimized.
-use device::{Argument, Device};
+use boxfnonce::SendBoxFnOnce;
 use codegen::Function;
+use device::{Argument, Device};
 use explorer::Candidate;
 use ir;
 use num;
-
-use boxfnonce::SendBoxFnOnce;
 
 /// A callback that is called after evaluating a kernel.
 pub type AsyncCallback<'a, 'b> = SendBoxFnOnce<'b, (Candidate<'a>, f64, usize)>;
@@ -23,17 +22,20 @@ pub trait Context<'a>: Sync {
     fn get_param<'b>(&'b self, &str) -> &'b Argument;
     /// Returns the execution time of a fully specified implementation in nanoseconds.
     fn evaluate(&self, space: &Function) -> Result<f64, ()>;
-    /// Calls the `inner` closure in parallel, and gives it a pointer to an `AsyncEvaluator`
-    /// to evaluate candidates in the context.
-    fn async_eval<'b, 'c>(&self, num_workers: usize,
-                          inner: &(Fn(&mut AsyncEvaluator<'b, 'c>) + Sync)) ;
+    /// Calls the `inner` closure in parallel, and gives it a pointer to an
+    /// `AsyncEvaluator` to evaluate candidates in the context.
+    fn async_eval<'b, 'c>(
+        &self,
+        num_workers: usize,
+        inner: &(Fn(&mut AsyncEvaluator<'b, 'c>) + Sync),
+    );
 
     /// Evaluate a size.
     fn eval_size(&self, size: &ir::Size) -> u32 {
         let mut result: u32 = size.factor();
         for p in size.dividend() {
             result *= unwrap!(self.get_param(&p.name).as_size());
-        };
+        }
         let (result, remider) = num::integer::div_rem(result, size.divisor());
         assert_eq!(remider, 0, "invalid size: {:?}", size);
         result
@@ -45,4 +47,3 @@ pub trait AsyncEvaluator<'a, 'b> {
     /// Add a kernel to evaluate.
     fn add_kernel(&mut self, candidate: Candidate<'a>, callback: AsyncCallback<'a, 'b>);
 }
-

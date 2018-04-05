@@ -1,4 +1,5 @@
-//! Compute and represent local information on the different objects representing of the IR.
+//! Compute and represent local information on the different objects representing of the
+//! IR.
 use device::{Context, Device};
 use ir::{self, BasicBlock};
 use model::HwPressure;
@@ -27,58 +28,98 @@ pub struct LocalInfo {
 impl LocalInfo {
     /// Compute the local information for the given search space, in the context.
     pub fn compute(space: &SearchSpace, context: &Context) -> Self {
-        let dim_sizes = space.ir_instance().dims()
-            .map(|d| (d.id(), context.eval_size(d.size()))).collect();
-        let nesting = space.ir_instance().blocks()
-            .map(|bb| (bb.bb_id(), Nesting::compute(space, bb.bb_id()))).collect();
-        let mut hw_pressure = space.ir_instance().blocks().map(|bb| {
-            (bb.bb_id(), context.device().hw_pressure(space, &dim_sizes, &nesting, bb))
-        }).collect();
-        let mut dim_overhead = space.ir_instance().dims().map(|d| {
-            let kind = space.domain().get_dim_kind(d.id());
-            (d.id(), context.device().loop_iter_pressure(kind))
-        }).collect();
+        let dim_sizes = space
+            .ir_instance()
+            .dims()
+            .map(|d| (d.id(), context.eval_size(d.size())))
+            .collect();
+        let nesting = space
+            .ir_instance()
+            .blocks()
+            .map(|bb| (bb.bb_id(), Nesting::compute(space, bb.bb_id())))
+            .collect();
+        let mut hw_pressure = space
+            .ir_instance()
+            .blocks()
+            .map(|bb| {
+                (
+                    bb.bb_id(),
+                    context
+                        .device()
+                        .hw_pressure(space, &dim_sizes, &nesting, bb),
+                )
+            })
+            .collect();
+        let mut dim_overhead = space
+            .ir_instance()
+            .dims()
+            .map(|d| {
+                let kind = space.domain().get_dim_kind(d.id());
+                (d.id(), context.device().loop_iter_pressure(kind))
+            })
+            .collect();
         let parallelism = parallelism(space, &nesting, &dim_sizes);
         // Add the pressure induced by induction variables.
         let mut thread_overhead = HwPressure::zero(context.device());
         for (_, var) in space.ir_instance().induction_vars() {
-            add_indvar_pressure(context.device(), space, &dim_sizes, var,
-                &mut hw_pressure, &mut dim_overhead, &mut thread_overhead);
+            add_indvar_pressure(
+                context.device(),
+                space,
+                &dim_sizes,
+                var,
+                &mut hw_pressure,
+                &mut dim_overhead,
+                &mut thread_overhead,
+            );
         }
         LocalInfo {
-            dim_sizes, nesting, hw_pressure, dim_overhead, thread_overhead, parallelism
+            dim_sizes,
+            nesting,
+            hw_pressure,
+            dim_overhead,
+            thread_overhead,
+            parallelism,
         }
     }
 }
 
-fn add_indvar_pressure(device: &Device,
-                       space: &SearchSpace,
-                       dim_sizes: &HashMap<ir::dim::Id, u32>,
-                       indvar: &ir::InductionVar,
-                       hw_pressure: &mut HashMap<ir::BBId, HwPressure>,
-                       dim_overhead: &mut HashMap<ir::dim::Id, (HwPressure, HwPressure)>,
-                       thread_overhead: &mut HwPressure) {
-   for &(dim, _) in indvar.dims() {
-       let dim_kind = space.domain().get_dim_kind(dim);
-       if dim_kind.intersects(DimKind::VECTOR) { continue; }
-       let t = device.lower_type(indvar.base().t(), space).unwrap_or(ir::Type::I(32));
-       let mut overhead = if dim_kind.intersects(DimKind::UNROLL | DimKind::LOOP) {
-           device.additive_indvar_pressure(&t)
-       } else {
-           device.multiplicative_indvar_pressure(&t)
-       };
-       // FIXME: do not add the latency if the if it is an additive unrolled dimension that can be
-       // precomputed
-       let size = dim_sizes[&dim];
-       if dim_kind.intersects(DimKind::THREAD | DimKind::BLOCK) {
-           thread_overhead.add_parallel(&overhead);
-       } else if size > 1 {
-           overhead.repeat_parallel(f64::from(size-1));
-           unwrap!(hw_pressure.get_mut(&dim.into())).add_parallel(&overhead);
-           overhead.repeat_parallel(1.0/f64::from(size-1));
-           unwrap!(dim_overhead.get_mut(&dim)).0.add_parallel(&overhead);
-       }
-   }
+fn add_indvar_pressure(
+    device: &Device,
+    space: &SearchSpace,
+    dim_sizes: &HashMap<ir::dim::Id, u32>,
+    indvar: &ir::InductionVar,
+    hw_pressure: &mut HashMap<ir::BBId, HwPressure>,
+    dim_overhead: &mut HashMap<ir::dim::Id, (HwPressure, HwPressure)>,
+    thread_overhead: &mut HwPressure,
+)
+{
+    for &(dim, _) in indvar.dims() {
+        let dim_kind = space.domain().get_dim_kind(dim);
+        if dim_kind.intersects(DimKind::VECTOR) {
+            continue;
+        }
+        let t = device
+            .lower_type(indvar.base().t(), space)
+            .unwrap_or(ir::Type::I(32));
+        let mut overhead = if dim_kind.intersects(DimKind::UNROLL | DimKind::LOOP) {
+            device.additive_indvar_pressure(&t)
+        } else {
+            device.multiplicative_indvar_pressure(&t)
+        };
+        // FIXME: do not add the latency if the if it is an additive unrolled dimension
+        // that can be precomputed
+        let size = dim_sizes[&dim];
+        if dim_kind.intersects(DimKind::THREAD | DimKind::BLOCK) {
+            thread_overhead.add_parallel(&overhead);
+        } else if size > 1 {
+            overhead.repeat_parallel(f64::from(size - 1));
+            unwrap!(hw_pressure.get_mut(&dim.into())).add_parallel(&overhead);
+            overhead.repeat_parallel(1.0 / f64::from(size - 1));
+            unwrap!(dim_overhead.get_mut(&dim))
+                .0
+                .add_parallel(&overhead);
+        }
+    }
 }
 
 /// Nesting of an object.
@@ -108,13 +149,23 @@ impl Nesting {
         let mut after_self = Vec::new();
         let mut bigger_merged_dims = Vec::new();
         for other_bb in space.ir_instance().blocks().map(|bb| bb.bb_id()) {
-            if other_bb == bb { continue; }
+            if other_bb == bb {
+                continue;
+            }
             let order = space.domain().get_order(other_bb, bb);
-            if Order::INNER.contains(order) { inner_bbs.push(other_bb); }
+            if Order::INNER.contains(order) {
+                inner_bbs.push(other_bb);
+            }
             if let ir::BBId::Dim(id) = other_bb {
-                if Order::INNER.contains(order) { inner_dims.push(id); }
-                if (Order::INNER | Order::BEFORE).contains(order) { before_self.push(id); }
-                if (Order::OUTER | Order::AFTER).contains(order) { after_self.push(id); }
+                if Order::INNER.contains(order) {
+                    inner_dims.push(id);
+                }
+                if (Order::INNER | Order::BEFORE).contains(order) {
+                    before_self.push(id);
+                }
+                if (Order::OUTER | Order::AFTER).contains(order) {
+                    after_self.push(id);
+                }
                 if order.intersects(Order::MERGED) && other_bb > bb {
                     bigger_merged_dims.push(id);
                 }
@@ -122,7 +173,9 @@ impl Nesting {
                     if outer_dims.iter().cloned().all(|outer: ir::dim::Id| {
                         let ord = space.domain().get_order(id.into(), outer.into());
                         !ord.contains(Order::MERGED)
-                    }) { outer_dims.push(id); }
+                    }) {
+                        outer_dims.push(id);
+                    }
                 }
             }
         }
@@ -165,28 +218,50 @@ impl Default for Parallelism {
 }
 
 /// Computes the minimal and maximal parallelism accross instructions.
-fn parallelism(space: &SearchSpace, nesting: &HashMap<ir::BBId, Nesting>,
-               dim_sizes: &HashMap<ir::dim::Id, u32>) -> Parallelism {
-    space.ir_instance().insts().map(|inst| {
-        let mut par = Parallelism::default();
-        for &dim in &nesting[&inst.bb_id()].outer_dims {
-            let kind = space.domain().get_dim_kind(dim);
-            let size = u64::from(dim_sizes[&dim]);
-            if kind == DimKind::BLOCK { par.min_num_blocks *= size; }
-            if kind.intersects(DimKind::BLOCK) { par.max_num_blocks *= size; }
-            let thread_or_block = DimKind::THREAD | DimKind::BLOCK;
-            if thread_or_block.contains(kind) { par.min_num_threads *= size; }
-            if kind == DimKind::THREAD { par.min_num_threads_per_block *= size; }
-            if DimKind::THREAD.intersects(kind) { par.max_num_threads_per_block *= size; }
-        }
-        par
-    }).fold(Parallelism::default(), |lhs, rhs| Parallelism {
-        min_num_blocks: cmp::max(lhs.min_num_blocks, rhs.min_num_blocks),
-        max_num_blocks: cmp::max(lhs.max_num_blocks, rhs.max_num_blocks),
-        min_num_threads: cmp::max(lhs.min_num_threads, rhs.min_num_threads),
-        min_num_threads_per_block: cmp::max(
-            lhs.min_num_threads_per_block, rhs.min_num_threads_per_block),
-        max_num_threads_per_block: cmp::max(
-            lhs.max_num_threads_per_block, rhs.max_num_threads_per_block),
-    })
+fn parallelism(
+    space: &SearchSpace,
+    nesting: &HashMap<ir::BBId, Nesting>,
+    dim_sizes: &HashMap<ir::dim::Id, u32>,
+) -> Parallelism
+{
+    space
+        .ir_instance()
+        .insts()
+        .map(|inst| {
+            let mut par = Parallelism::default();
+            for &dim in &nesting[&inst.bb_id()].outer_dims {
+                let kind = space.domain().get_dim_kind(dim);
+                let size = u64::from(dim_sizes[&dim]);
+                if kind == DimKind::BLOCK {
+                    par.min_num_blocks *= size;
+                }
+                if kind.intersects(DimKind::BLOCK) {
+                    par.max_num_blocks *= size;
+                }
+                let thread_or_block = DimKind::THREAD | DimKind::BLOCK;
+                if thread_or_block.contains(kind) {
+                    par.min_num_threads *= size;
+                }
+                if kind == DimKind::THREAD {
+                    par.min_num_threads_per_block *= size;
+                }
+                if DimKind::THREAD.intersects(kind) {
+                    par.max_num_threads_per_block *= size;
+                }
+            }
+            par
+        })
+        .fold(Parallelism::default(), |lhs, rhs| Parallelism {
+            min_num_blocks: cmp::max(lhs.min_num_blocks, rhs.min_num_blocks),
+            max_num_blocks: cmp::max(lhs.max_num_blocks, rhs.max_num_blocks),
+            min_num_threads: cmp::max(lhs.min_num_threads, rhs.min_num_threads),
+            min_num_threads_per_block: cmp::max(
+                lhs.min_num_threads_per_block,
+                rhs.min_num_threads_per_block,
+            ),
+            max_num_threads_per_block: cmp::max(
+                lhs.max_num_threads_per_block,
+                rhs.max_num_threads_per_block,
+            ),
+        })
 }

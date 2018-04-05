@@ -1,13 +1,15 @@
 //! Describes the instructions.
 use device::Device;
-use ir::{self, BasicBlock, BBId, Operand, Operator, Type, DimMapScope};
+use ir::{self, BBId, BasicBlock, DimMapScope, Operand, Operator, Type};
 use std::fmt;
 use std::hash::{Hash, Hasher};
 use utils::*;
 
 /// Uniquely identifies an instruction.
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct InstId { pub id: u32 }
+pub struct InstId {
+    pub id: u32,
+}
 
 impl fmt::Debug for InstId {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { self.id.fmt(f) }
@@ -23,10 +25,19 @@ pub struct Instruction<'a> {
 
 impl<'a> Instruction<'a> {
     /// Creates a new instruction and type-check the operands.
-    pub fn new(operator: Operator<'a>, id: InstId, iter_dims: HashSet<ir::dim::Id>,
-               device: &Device) -> Instruction<'a> {
+    pub fn new(
+        operator: Operator<'a>,
+        id: InstId,
+        iter_dims: HashSet<ir::dim::Id>,
+        device: &Device,
+    ) -> Instruction<'a>
+    {
         operator.type_check(device);
-        Instruction { operator, id, iter_dims }
+        Instruction {
+            operator,
+            id,
+            iter_dims,
+        }
     }
 
     /// Returns the list of operands of an `Instruction`.
@@ -45,42 +56,56 @@ impl<'a> Instruction<'a> {
     pub fn has_side_effects(&self) -> bool { self.operator.has_side_effects() }
 
     /// Applies the lowering of a layout to the instruction.
-    pub fn lower_layout(&mut self,
-                        ld_idx: Operand<'a>, ld_pattern: ir::AccessPattern,
-                        st_idx: Operand<'a>, st_pattern: ir::AccessPattern) {
+    pub fn lower_layout(
+        &mut self,
+        ld_idx: Operand<'a>,
+        ld_pattern: ir::AccessPattern,
+        st_idx: Operand<'a>,
+        st_pattern: ir::AccessPattern,
+    )
+    {
         self.operator = match self.operator.clone() {
             Operator::TmpLd(t, id2) => {
                 assert_eq!(ld_pattern.mem_block(), id2);
                 Operator::Ld(t, ld_idx, ld_pattern)
-            },
+            }
             Operator::TmpSt(val, id2) => {
                 assert_eq!(st_pattern.mem_block(), id2);
                 Operator::St(st_idx, val, false, st_pattern)
-            },
-            _ => panic!("Only TmpLd/TmpSt are changed on a layout lowering")
+            }
+            _ => panic!("Only TmpLd/TmpSt are changed on a layout lowering"),
         };
     }
 
     /// Lowers the `DimMap` of an operand into an access to a temporary memory.
-    pub fn lower_dim_map(&mut self, op_id: usize, new_src: InstId,
-                         new_dim_map: ir::DimMap) {
+    pub fn lower_dim_map(
+        &mut self,
+        op_id: usize,
+        new_src: InstId,
+        new_dim_map: ir::DimMap,
+    )
+    {
         let operand = &mut *self.operator.operands_mut()[op_id];
         match *operand {
             Operand::Inst(ref mut src, _, ref mut dim_map, ref mut can_lower) => {
                 *src = new_src;
                 *dim_map = new_dim_map;
                 *can_lower = DimMapScope::Local;
-            },
-            _ => panic!()
+            }
+            _ => panic!(),
         }
     }
 
     /// Indicates the operands for wich a `DimMap` must be lowered if lhs and rhs are
     /// not mapped.
     pub fn dim_maps_to_lower(&self, lhs: ir::dim::Id, rhs: ir::dim::Id) -> Vec<usize> {
-        self.operator().operands().iter().enumerate()
+        self.operator()
+            .operands()
+            .iter()
+            .enumerate()
             .filter(|&(_, op)| op.should_lower_map(lhs, rhs))
-            .map(|(id, _)| id).collect()
+            .map(|(id, _)| id)
+            .collect()
     }
 
     /// Returns `true` if `self` can be vectorized on a dimension of size `size`.
@@ -101,9 +126,11 @@ impl<'a> Instruction<'a> {
     /// Returns 'true' if `self` is a reduction initialized by init, and if 'dim' should
     /// have the same nesting with 'init' that with 'self'.
     pub fn is_reduction_common_dim(&self, init: InstId, dim: ir::dim::Id) -> bool {
-        self.as_reduction().map(|(i, map, rd)| {
-            i == init && !rd.contains(&dim) && map.iter().all(|&(_, rhs)| dim != rhs)
-        }).unwrap_or(false)
+        self.as_reduction()
+            .map(|(i, map, rd)| {
+                i == init && !rd.contains(&dim) && map.iter().all(|&(_, rhs)| dim != rhs)
+            })
+            .unwrap_or(false)
     }
 
     /// Rename a dimension to another ID.

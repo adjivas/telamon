@@ -19,7 +19,9 @@ impl<'a> InductionVar<'a> {
         assert!(base.t().is_integer());
         // Assert dimensions are unique.
         let mut dim_ids = HashSet::default();
-        for &(id, _) in &dims { assert!(dim_ids.insert(id)); }
+        for &(id, _) in &dims {
+            assert!(dim_ids.insert(id));
+        }
         match base {
             ir::Operand::Reduce(..) =>
                 panic!("induction variables cannot perform reductions"),

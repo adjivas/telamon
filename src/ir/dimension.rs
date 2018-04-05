@@ -5,9 +5,11 @@ use std::hash::{Hash, Hasher};
 
 /// Provides a unique identifier for iteration dimensions.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct Id { pub id: u32 }
+pub struct Id {
+    pub id: u32,
+}
 
-impl fmt::Debug  for Id {
+impl fmt::Debug for Id {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { self.id.fmt(f) }
 }
 
@@ -23,7 +25,11 @@ impl<'a> Dimension<'a> {
     /// Creates a new dimension.
     pub fn new(size: ir::Size, id: Id) -> Dimension {
         assert_ne!(size.as_int(), Some(1));
-        Dimension { size, id, iterated: Vec::new() }
+        Dimension {
+            size,
+            id,
+            iterated: Vec::new(),
+        }
     }
 
     /// Retruns the size of the dimension.
@@ -33,7 +39,7 @@ impl<'a> Dimension<'a> {
     pub fn id(&self) -> Id { self.id }
 
     /// Returns the constructs iterated along this dimension.
-    pub fn iterated<'b>(&'b self) -> impl Iterator<Item=ir::InstId> + 'b {
+    pub fn iterated<'b>(&'b self) -> impl Iterator<Item = ir::InstId> + 'b {
         self.iterated.iter().cloned()
     }
 

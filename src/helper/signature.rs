@@ -1,10 +1,12 @@
 //! Helper functions to create a function signature and bind parameters.
 use device;
-use ir::{Signature, Parameter, mem};
 use helper::tensor::DimSize;
+use ir::{mem, Parameter, Signature};
 
 /// Helper struct to build a `Signature`.
-pub struct Builder<'a, 'b> where 'b: 'a {
+pub struct Builder<'a, 'b>
+where 'b: 'a
+{
     context: &'a mut device::Context<'b>,
     signature: Signature,
 }
@@ -15,14 +17,20 @@ impl<'a, 'b> Builder<'a, 'b> {
         let signature = Signature {
             name: name.to_string(),
             params: vec![],
-            mem_blocks: 0
+            mem_blocks: 0,
         };
-        Builder { context, signature }
+        Builder {
+            context,
+            signature,
+        }
     }
 
     /// Creates a new parameter and binds it to the given value.
     pub fn param<T: device::Argument + 'b>(&mut self, name: &str, arg: T) {
-        let param = Parameter { name: name.to_string(), t: arg.t(), };
+        let param = Parameter {
+            name: name.to_string(),
+            t: arg.t(),
+        };
         self.context.bind_param(&param, Box::new(arg));
         self.signature.params.push(param);
     }
@@ -38,7 +46,10 @@ impl<'a, 'b> Builder<'a, 'b> {
     pub fn array(&mut self, name: &str, size: usize) -> mem::Id {
         let id = self.alloc_array_id();
         let array = self.context.allocate_array(id, size);
-        let param = Parameter { name: name.to_string(), t: array.t(), };
+        let param = Parameter {
+            name: name.to_string(),
+            t: array.t(),
+        };
         self.context.bind_param(&param, array);
         self.signature.params.push(param);
         id

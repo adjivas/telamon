@@ -1,10 +1,10 @@
 //! Defines operators.
+use self::Operator::*;
 use device::Device;
-use ir::{self, AccessPattern, Dimension, mem, Operand, Stride, Type};
+use ir::{self, mem, AccessPattern, Dimension, Operand, Stride, Type};
 use itertools::Itertools;
 use std::borrow::Cow;
 use std::fmt;
-use self::Operator::*;
 
 /// The rounding mode of an arithmetic operation.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -62,18 +62,18 @@ impl<'a> Operator<'a> {
             assert!(device.is_valid_type(&t));
         }
         match *self {
-            Add(ref lhs, ref rhs, rounding) |
-            Sub(ref lhs, ref rhs, rounding) |
-            Div(ref lhs, ref rhs, rounding) => {
+            Add(ref lhs, ref rhs, rounding)
+            | Sub(ref lhs, ref rhs, rounding)
+            | Div(ref lhs, ref rhs, rounding) => {
                 assert!(lhs.t().is_float() ^ (rounding == Rounding::Exact));
                 assert_eq!(lhs.t(), rhs.t());
-            },
+            }
             Mul(ref lhs, ref rhs, rounding, ref res_type) => {
                 assert!(lhs.t().is_float() ^ (rounding == Rounding::Exact));
                 match (lhs.t(), rhs.t(), res_type) {
                     (ref x, ref y, z) if x == y && y == z => (),
-                    (Type::I(32), Type::I(32), &Type::I(64)) |
-                    (Type::I(32), Type::I(32), &Type::PtrTo(_)) => (),
+                    (Type::I(32), Type::I(32), &Type::I(64))
+                    | (Type::I(32), Type::I(32), &Type::PtrTo(_)) => (),
                     _ => panic!(),
                 }
             }
@@ -81,22 +81,23 @@ impl<'a> Operator<'a> {
                 assert!(mul_lhs.t().is_float() ^ (rounding == Rounding::Exact));
                 match (mul_lhs.t(), mul_rhs.t(), add_rhs.t()) {
                     (ref x, ref y, ref z) if x == y && y == z => (),
-                    (Type::I(32), Type::I(32), Type::I(64)) |
-                    (Type::I(32), Type::I(32), Type::PtrTo(_)) => (),
+                    (Type::I(32), Type::I(32), Type::I(64))
+                    | (Type::I(32), Type::I(32), Type::PtrTo(_)) => (),
                     _ => panic!(),
                 }
-            },
+            }
             Ld(ref t, ref addr, ref pattern) => {
                 assert_ne!(*t, Type::Void);
                 assert_eq!(addr.t(), Type::PtrTo(pattern.mem_block()));
-            },
-            St(ref addr, _, _, ref pattern) =>
-                assert_eq!(addr.t(), Type::PtrTo(pattern.mem_block())),
+            }
+            St(ref addr, _, _, ref pattern) => {
+                assert_eq!(addr.t(), Type::PtrTo(pattern.mem_block()))
+            }
             TmpLd(ref t, _) => assert_ne!(*t, Type::Void),
             Cast(ref src, ref t) => {
                 assert_ne!(src.t(), Type::Void);
                 assert_ne!(*t, Type::Void);
-            },
+            }
             Mov(..) | TmpSt(..) => (),
         }
     }
@@ -104,11 +105,11 @@ impl<'a> Operator<'a> {
     /// Returns the type of the value produced.
     pub fn t(&self) -> Type {
         match *self {
-            Add(ref op, _, _) |
-            Sub(ref op, _, _) |
-            Mov(ref op) |
-            Mad(_, _, ref op, _) |
-            Div(ref op, _, _) => op.t(),
+            Add(ref op, ..)
+            | Sub(ref op, ..)
+            | Mov(ref op)
+            | Mad(_, _, ref op, _)
+            | Div(ref op, ..) => op.t(),
             Ld(t, ..) | TmpLd(t, _) | Cast(_, t) | Mul(.., t) => t,
             St(..) | TmpSt(..) => Type::Void,
         }
@@ -117,17 +118,17 @@ impl<'a> Operator<'a> {
     /// Retruns the list of operands.
     pub fn operands(&self) -> Vec<&Operand<'a>> {
         match *self {
-            Add(ref lhs, ref rhs, _) |
-            Sub(ref lhs, ref rhs, _) |
-            Mul(ref lhs, ref rhs, _, _) |
-            Div(ref lhs, ref rhs, _) |
-            St(ref lhs, ref rhs, _, _) => vec![lhs, rhs],
-            Mad(ref mul_lhs, ref mul_rhs, ref add_rhs, _) =>
-                vec![mul_lhs, mul_rhs, add_rhs],
-            Mov(ref op) |
-            Ld(_, ref op, _) |
-            TmpSt(ref op, _) |
-            Cast(ref op, _) => vec![op],
+            Add(ref lhs, ref rhs, _)
+            | Sub(ref lhs, ref rhs, _)
+            | Mul(ref lhs, ref rhs, ..)
+            | Div(ref lhs, ref rhs, _)
+            | St(ref lhs, ref rhs, ..) => vec![lhs, rhs],
+            Mad(ref mul_lhs, ref mul_rhs, ref add_rhs, _) => {
+                vec![mul_lhs, mul_rhs, add_rhs]
+            }
+            Mov(ref op) | Ld(_, ref op, _) | TmpSt(ref op, _) | Cast(ref op, _) => {
+                vec![op]
+            }
             TmpLd(..) => vec![],
         }
     }
@@ -135,17 +136,18 @@ impl<'a> Operator<'a> {
     /// Retruns the list of mutable references to operands.
     pub fn operands_mut<'b>(&'b mut self) -> Vec<&'b mut Operand<'a>> {
         match *self {
-            Add(ref mut lhs, ref mut rhs, _) |
-            Sub(ref mut lhs, ref mut rhs, _) |
-            Mul(ref mut lhs, ref mut rhs, _, _) |
-            Div(ref mut lhs, ref mut rhs, _) |
-            St(ref mut lhs, ref mut rhs, _, _) => vec![lhs, rhs],
-            Mad(ref mut mul_lhs, ref mut mul_rhs, ref mut add_rhs, _) =>
-                vec![mul_lhs, mul_rhs, add_rhs],
-            Mov(ref mut op) |
-            Ld(_, ref mut op, _) |
-            TmpSt(ref mut op, _) |
-            Cast(ref mut op, _) => vec![op],
+            Add(ref mut lhs, ref mut rhs, _)
+            | Sub(ref mut lhs, ref mut rhs, _)
+            | Mul(ref mut lhs, ref mut rhs, ..)
+            | Div(ref mut lhs, ref mut rhs, _)
+            | St(ref mut lhs, ref mut rhs, ..) => vec![lhs, rhs],
+            Mad(ref mut mul_lhs, ref mut mul_rhs, ref mut add_rhs, _) => {
+                vec![mul_lhs, mul_rhs, add_rhs]
+            }
+            Mov(ref mut op)
+            | Ld(_, ref mut op, _)
+            | TmpSt(ref mut op, _)
+            | Cast(ref mut op, _) => vec![op],
             TmpLd(..) => vec![],
         }
     }
@@ -154,16 +156,8 @@ impl<'a> Operator<'a> {
     pub fn has_side_effects(&self) -> bool {
         match *self {
             St(_, _, b, _) => b,
-            Add(..) |
-            Sub(..) |
-            Mul(..) |
-            Mad(..) |
-            Mov(..) |
-            Div(..) |
-            Ld(..) |
-            TmpLd(..) |
-            TmpSt(..) |
-            Cast(..) => false
+            Add(..) | Sub(..) | Mul(..) | Mad(..) | Mov(..) | Div(..) | Ld(..)
+            | TmpLd(..) | TmpSt(..) | Cast(..) => false,
         }
     }
 
@@ -174,42 +168,50 @@ impl<'a> Operator<'a> {
         match *self {
             St(_, ref operand, _, ref pattern) => {
                 if let Some(type_len) = operand.t().len_byte() {
-                    dim.size().as_int().into_iter().any(|x| x == 2 || x == 4) &&
-                        pattern.stride(dim.id()) == Stride::Int(type_len as i32)
-                } else { false }
-            },
+                    dim.size()
+                        .as_int()
+                        .into_iter()
+                        .any(|x| x == 2 || x == 4)
+                        && pattern.stride(dim.id()) == Stride::Int(type_len as i32)
+                } else {
+                    false
+                }
+            }
             Ld(ref t, _, ref pattern) => {
                 if let Some(type_len) = t.len_byte() {
-                    dim.size().as_int().into_iter().any(|x| x == 2 || x == 4) &&
-                        pattern.stride(dim.id()) == Stride::Int(type_len as i32)
-                } else { false }
-            },
-            Add(..) |
-            Sub(..) |
-            Mul(..) |
-            Mad(..) |
-            Div(..) |
-            Mov(..) |
-            Cast(..) => false,
-            TmpLd(..) |
-            TmpSt(..) => dim.size().as_int().into_iter().any(|x| x == 2 || x == 4),
+                    dim.size()
+                        .as_int()
+                        .into_iter()
+                        .any(|x| x == 2 || x == 4)
+                        && pattern.stride(dim.id()) == Stride::Int(type_len as i32)
+                } else {
+                    false
+                }
+            }
+            Add(..) | Sub(..) | Mul(..) | Mad(..) | Div(..) | Mov(..) | Cast(..) => false,
+            TmpLd(..) | TmpSt(..) => dim.size()
+                .as_int()
+                .into_iter()
+                .any(|x| x == 2 || x == 4),
         }
     }
 
     /// Renames a basic block.
     pub fn merge_dims(&mut self, lhs: ir::dim::Id, rhs: ir::dim::Id) {
-        self.operands_mut().iter_mut().foreach(|x| x.merge_dims(lhs, rhs));
+        self.operands_mut()
+            .iter_mut()
+            .foreach(|x| x.merge_dims(lhs, rhs));
     }
 
     /// Returns the pattern of access to the memory by the instruction, if any.
     pub fn mem_access_pattern(&self) -> Option<Cow<AccessPattern>> {
         match *self {
-            Ld(_, _, ref pattern) |
-            St(_, _, _, ref pattern) => Some(Cow::Borrowed(pattern)),
-            TmpLd(_, mem_id) |
-            TmpSt(_, mem_id) => {
+            Ld(_, _, ref pattern) | St(_, _, _, ref pattern) => {
+                Some(Cow::Borrowed(pattern))
+            }
+            TmpLd(_, mem_id) | TmpSt(_, mem_id) => {
                 Some(Cow::Owned(AccessPattern::Unknown { mem_id }))
-            },
+            }
             _ => None,
         }
     }
@@ -221,7 +223,11 @@ impl<'a> Operator<'a> {
 
     /// Indicates if the operator supports non-coherent memory accesses.
     pub fn supports_nc_access(&self) -> bool {
-        if let Ld(..) = *self { true } else { false }
+        if let Ld(..) = *self {
+            true
+        } else {
+            false
+        }
     }
 }
 

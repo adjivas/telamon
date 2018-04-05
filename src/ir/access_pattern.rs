@@ -25,7 +25,11 @@ pub enum AccessPattern {
     /// Unknown access pattern.
     Unknown { mem_id: ir::mem::Id },
     /// Corresponds to accessing a tensor stored in a contiguous array in memory.
-    Tensor { mem_id: ir::mem::Id, stride: i32, dims: Vec<ir::dim::Id> },
+    Tensor {
+        mem_id: ir::mem::Id,
+        stride: i32,
+        dims: Vec<ir::dim::Id>,
+    },
 }
 
 impl AccessPattern {
@@ -33,7 +37,9 @@ impl AccessPattern {
     pub fn stride(&self, dim: ir::dim::Id) -> Stride {
         match *self {
             AccessPattern::Unknown { .. } => Stride::Unknown,
-            AccessPattern::Tensor { stride, ref dims, .. } => {
+            AccessPattern::Tensor {
+                stride, ref dims, ..
+            } => {
                 if dims.last() == Some(&dim) {
                     Stride::Int(stride)
                 } else if dims.iter().any(|x| *x == dim) {
@@ -41,7 +47,7 @@ impl AccessPattern {
                 } else {
                     Stride::Int(0)
                 }
-            },
+            }
         }
     }
 
@@ -49,16 +55,20 @@ impl AccessPattern {
     pub fn rename(&mut self, old: ir::dim::Id, new: ir::dim::Id) {
         match *self {
             AccessPattern::Unknown { .. } => (),
-            AccessPattern::Tensor { ref mut dims, .. } =>
-                for dim in dims { if *dim == old { *dim = new; } },
+            AccessPattern::Tensor { ref mut dims, .. } => for dim in dims {
+                if *dim == old {
+                    *dim = new;
+                }
+            },
         }
     }
 
     /// Returns the id of the memory block accessed.
     pub fn mem_block(&self) -> ir::mem::Id {
         match *self {
-            AccessPattern::Unknown { mem_id } |
-            AccessPattern::Tensor { mem_id, .. } => mem_id,
+            AccessPattern::Unknown { mem_id } | AccessPattern::Tensor { mem_id, .. } => {
+                mem_id
+            }
         }
     }
 }

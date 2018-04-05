@@ -18,9 +18,7 @@ pub trait Argument: Sync + Send {
 impl Argument for f32 {
     fn t(&self) -> Type { Type::F(32) }
 
-    fn raw_ptr(&self) -> *const libc::c_void {
-        self as *const f32 as *const libc::c_void
-    }
+    fn raw_ptr(&self) -> *const libc::c_void { self as *const f32 as *const libc::c_void }
 
     fn size_of(&self) -> usize { std::mem::size_of::<Self>() }
 }
@@ -28,9 +26,7 @@ impl Argument for f32 {
 impl Argument for f64 {
     fn t(&self) -> Type { Type::F(64) }
 
-    fn raw_ptr(&self) -> *const libc::c_void {
-        self as *const f64 as *const libc::c_void
-    }
+    fn raw_ptr(&self) -> *const libc::c_void { self as *const f64 as *const libc::c_void }
 
     fn size_of(&self) -> usize { std::mem::size_of::<Self>() }
 }
@@ -40,9 +36,7 @@ impl Argument for i8 {
 
     fn t(&self) -> Type { Type::I(8) }
 
-    fn raw_ptr(&self) -> *const libc::c_void {
-        self as *const i8 as *const libc::c_void
-    }
+    fn raw_ptr(&self) -> *const libc::c_void { self as *const i8 as *const libc::c_void }
 
     fn size_of(&self) -> usize { std::mem::size_of::<Self>() }
 }
@@ -52,9 +46,7 @@ impl Argument for i16 {
 
     fn t(&self) -> Type { Type::I(16) }
 
-    fn raw_ptr(&self) -> *const libc::c_void {
-        self as *const i16 as *const libc::c_void
-    }
+    fn raw_ptr(&self) -> *const libc::c_void { self as *const i16 as *const libc::c_void }
 
     fn size_of(&self) -> usize { std::mem::size_of::<Self>() }
 }
@@ -64,9 +56,7 @@ impl Argument for i32 {
 
     fn t(&self) -> Type { Type::I(32) }
 
-    fn raw_ptr(&self) -> *const libc::c_void {
-        self as *const i32 as *const libc::c_void
-    }
+    fn raw_ptr(&self) -> *const libc::c_void { self as *const i32 as *const libc::c_void }
 
     fn size_of(&self) -> usize { std::mem::size_of::<Self>() }
 }
@@ -76,9 +66,7 @@ impl Argument for i64 {
 
     fn t(&self) -> Type { Type::I(64) }
 
-    fn raw_ptr(&self) -> *const libc::c_void {
-        self as *const i64 as *const libc::c_void
-    }
+    fn raw_ptr(&self) -> *const libc::c_void { self as *const i64 as *const libc::c_void }
 
     fn size_of(&self) -> usize { std::mem::size_of::<Self>() }
 }

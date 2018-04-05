@@ -1,25 +1,27 @@
 //! Exploration of the search space.
 
 use device::Context;
+pub use explorer::candidate::Candidate;
+use explorer::choice;
+use explorer::config::Config;
+use explorer::store::Store;
 use interval_heap::IntervalHeap;
 use std;
 use std::f64;
 
-pub use explorer::candidate::Candidate;
-use explorer::config::Config;
-use explorer::choice;
-use explorer::store::Store;
-
 impl<'a> Store<'a> for ParallelCandidateList<'a> {
     type PayLoad = ();
 
-    fn update_cut(&self, new_cut: f64) {
-        self.lock().0.update_cut(new_cut);
-    }
+    fn update_cut(&self, new_cut: f64) { self.lock().0.update_cut(new_cut); }
 
-    fn commit_evaluation(&self, _: &Config, (): Self::PayLoad, _: f64) { }
+    fn commit_evaluation(&self, _: &Config, (): Self::PayLoad, _: f64) {}
 
-    fn explore(&self, _config: &Config, context: &Context) -> Option<(Candidate<'a>, Self::PayLoad)> {
+    fn explore(
+        &self,
+        _config: &Config,
+        context: &Context,
+    ) -> Option<(Candidate<'a>, Self::PayLoad)>
+    {
         loop {
             if let Some(candidate) = self.pop() {
                 let choice_opt = choice::list(&candidate.space).next();
@@ -28,8 +30,9 @@ impl<'a> Store<'a> for ParallelCandidateList<'a> {
                 } else {
                     return Some((candidate, ()));
                 }
+            } else {
+                return None;
             }
-            else {return None;}
         }
     }
 }
@@ -58,10 +61,11 @@ impl<'a> ParallelCandidateList<'a> {
     /// Insert multiple candidates to process.
     pub fn insert_many(&self, candidates: Vec<Candidate<'a>>) {
         let mut lock = self.lock();
-        for candidate in candidates { lock.0.insert(candidate); }
+        for candidate in candidates {
+            lock.0.insert(candidate);
+        }
         self.wakeup.notify_all();
     }
-
 
     /// Returns a candidate to process or `None` if the queue has been entirely processed.
     pub fn pop(&self) -> Option<Candidate<'a>> {
@@ -117,8 +121,13 @@ impl<'a> CandidateList<'a> {
         self.n_candidate += 1;
         if candidate.bound.value() < self.cut {
             let bound = candidate.bound.value();
-            info!("inserting candidate {}: {:.4e}ns < {:.4e}ns, {} in queue",
-                  self.n_candidate, bound, self.cut, self.queue.len());
+            info!(
+                "inserting candidate {}: {:.4e}ns < {:.4e}ns, {} in queue",
+                self.n_candidate,
+                bound,
+                self.cut,
+                self.queue.len()
+            );
             self.queue.push(candidate);
         } else {
             self.drop_candidate(candidate);
@@ -127,30 +136,40 @@ impl<'a> CandidateList<'a> {
 
     pub fn update_cut(&mut self, new_cut: f64) {
         self.cut = new_cut;
-        while self.queue.max().map_or(false, |x| x.bound.value() >= new_cut) {
+        while self.queue
+            .max()
+            .map_or(false, |x| x.bound.value() >= new_cut)
+        {
             let candidate = self.queue.pop_max().unwrap();
             self.drop_candidate(candidate);
         }
     }
 
-
-
     /// Returns a candidate to process.
     pub fn pop(&mut self) -> Option<Candidate<'a>> {
         let candidate = self.queue.pop_min();
         if let Some(ref x) = candidate {
-            warn!("candidate {}, depth {}, bound {:.4e}ns, cut {:.4e}ns, queue {}, leaves {}",
-                  self.n_candidate, x.depth, x.bound.value(), self.cut,
-                  self.queue.len(), self.n_leaf);
+            warn!(
+                "candidate {}, depth {}, bound {:.4e}ns, cut {:.4e}ns, queue {}, leaves \
+                 {}",
+                self.n_candidate,
+                x.depth,
+                x.bound.value(),
+                self.cut,
+                self.queue.len(),
+                self.n_leaf
+            );
         }
         candidate
     }
 
-
     /// Drops a candiate.
     fn drop_candidate(&mut self, candidate: Candidate<'a>) {
-        info!("dropping candidate: {:.4e}ns >= {:.4e}ns.",
-              candidate.bound.value(), self.cut);
+        info!(
+            "dropping candidate: {:.4e}ns >= {:.4e}ns.",
+            candidate.bound.value(),
+            self.cut
+        );
         self.n_dropped += 1;
     }
 }

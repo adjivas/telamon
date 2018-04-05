@@ -1,13 +1,13 @@
 //! Parallel PTX compilation.
-use device::cuda::api::{Module};
+use device::cuda::api::Module;
 use device::cuda::api::wrapper::*;
 use errno::errno;
 use ipc_channel::ipc;
 use libc;
 use prctl;
-use std::slice;
-use std::ffi::CString;
 use std;
+use std::ffi::CString;
+use std::slice;
 
 /// A process that compiles PTX in a separate process.
 pub struct JITDaemon {
@@ -73,7 +73,7 @@ impl DaemonSpawner {
         // Set the current process as the manager of subprocesses. Otherwise, we can't
         // wait on grandchildrens.
         if prctl::set_child_subreaper(true).is_err() {
-                panic!("unable to set the subreaper flag: {}", errno());
+            panic!("unable to set the subreaper flag: {}", errno());
         }
         let (pid_sender, pid_receiver) = unwrap!(ipc::channel());
         let (channel_sender, channel_receiver) = unwrap!(ipc::channel());
@@ -85,18 +85,21 @@ impl DaemonSpawner {
                         Ok(None) => {
                             trace!("exiting PTX daemon spawner");
                             return;
-                        },
+                        }
                         Err(err) => {
                             error!("error in PTX daemon spawner: {:?}", err);
                             return;
-                        },
+                        }
                     };
                     // We daemonize the JIT so it is attached to the closet subreaper
                     // process, i.e. the main process.
                     let tmp_pid = fork_function(|| {
                         let pid = fork_function(|| daemon(&receiver, &sender));
                         if let Err(err) = pid_sender.send(pid) {
-                            error!("error in PTX daemon spawner (sending PID): {:?}", err);
+                            error!(
+                                "error in PTX daemon spawner (sending PID): {:?}",
+                                err
+                            );
                             return;
                         }
                     });
@@ -106,7 +109,11 @@ impl DaemonSpawner {
                 }
             })
         };
-        DaemonSpawner { sender: channel_sender, receiver: pid_receiver, pid }
+        DaemonSpawner {
+            sender: channel_sender,
+            receiver: pid_receiver,
+            pid,
+        }
     }
 
     /// Creates a new `JITDaemon`.
@@ -115,7 +122,11 @@ impl DaemonSpawner {
         let (cubin_sender, cubin_receiver) = unwrap!(ipc::bytes_channel());
         unwrap!(self.sender.send(Some((ptx_receiver, cubin_sender))));
         let daemon = unwrap!(self.receiver.recv());
-        JITDaemon { daemon, ptx_sender, cubin_receiver }
+        JITDaemon {
+            daemon,
+            ptx_sender,
+            cubin_receiver,
+        }
     }
 }
 
@@ -135,7 +146,10 @@ impl Drop for DaemonSpawner {
 unsafe fn fork_function<F: FnOnce()>(f: F) -> libc::pid_t {
     match libc::fork() {
         -1 => panic!("could no forl the process: {}", errno()),
-        0 => { f(); libc::exit(0) },
+        0 => {
+            f();
+            libc::exit(0)
+        }
         pid => pid,
     }
 }

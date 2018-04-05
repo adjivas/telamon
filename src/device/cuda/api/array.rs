@@ -18,9 +18,10 @@ impl<'a, T> Array<'a, T> {
     pub fn new(context: &'a CudaContext, len: usize) -> Self {
         let n_bytes = (len * std::mem::size_of::<T>()) as u64;
         Array {
-            len, context,
-            array:  unsafe { allocate_array(context, n_bytes) },
-            t: std::marker::PhantomData
+            len,
+            context,
+            array: unsafe { allocate_array(context, n_bytes) },
+            t: std::marker::PhantomData,
         }
     }
 
@@ -30,7 +31,12 @@ impl<'a, T> Array<'a, T> {
         unsafe {
             vec.set_len(self.len);
             let host_ptr = vec.as_mut_ptr() as *mut libc::c_void;
-            copy_DtoH(self.context, self.array, host_ptr, self.byte_len() as u64);
+            copy_DtoH(
+                self.context,
+                self.array,
+                host_ptr,
+                self.byte_len() as u64,
+            );
         }
         vec
     }
@@ -40,7 +46,12 @@ impl<'a, T> Array<'a, T> {
         assert_eq!(self.len, vec.len());
         unsafe {
             let host_ptr = vec.as_ptr() as *const libc::c_void;
-            copy_HtoD(self.context, host_ptr, self.array, self.byte_len() as u64);
+            copy_HtoD(
+                self.context,
+                host_ptr,
+                self.array,
+                self.byte_len() as u64,
+            );
         }
     }
 
@@ -49,7 +60,14 @@ impl<'a, T> Array<'a, T> {
 
     fn clone_from(&mut self, src: &Self) {
         assert_eq!(self.len, src.len);
-        unsafe { copy_DtoD(self.context, src.array, self.array, self.byte_len() as u64); }
+        unsafe {
+            copy_DtoD(
+                self.context,
+                src.array,
+                self.array,
+                self.byte_len() as u64,
+            );
+        }
     }
 }
 
@@ -62,13 +80,22 @@ impl<'a, T> Clone for Array<'a, T> {
 
     fn clone_from(&mut self, src: &Self) {
         assert_eq!(self.len, src.len);
-        unsafe { copy_DtoD(self.context, src.array, self.array, self.byte_len() as u64); }
+        unsafe {
+            copy_DtoD(
+                self.context,
+                src.array,
+                self.array,
+                self.byte_len() as u64,
+            );
+        }
     }
 }
 
 impl<'a, T> Drop for Array<'a, T> {
     fn drop(&mut self) {
-        unsafe { free_array(self.context, self.array); }
+        unsafe {
+            free_array(self.context, self.array);
+        }
     }
 }
 
@@ -87,9 +114,11 @@ pub fn compare_f32(lhs: &Array<f32>, rhs: &Array<f32>) -> f32 {
     assert_eq!(lhs.len, rhs.len);
     let lhs_vec = lhs.copy_to_host();
     let rhs_vec = rhs.copy_to_host();
-    lhs_vec.iter().zip(&rhs_vec).map(|(x, y)| {
-        2.0*(x - y)/(x.abs() + y.abs())
-    }).fold(0.0, f32::max)
+    lhs_vec
+        .iter()
+        .zip(&rhs_vec)
+        .map(|(x, y)| 2.0 * (x - y) / (x.abs() + y.abs()))
+        .fold(0.0, f32::max)
 }
 
 pub struct ArrayArg<'a, T>(pub Array<'a, T>, pub ir::mem::Id);

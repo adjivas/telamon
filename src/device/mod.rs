@@ -1,21 +1,20 @@
 //! Code generation and candidate evaluation for specific targets.
-#[cfg(feature="cuda")]
+#[cfg(feature = "cuda")]
 pub mod cuda;
-#[cfg(feature="mppa")]
+#[cfg(feature = "mppa")]
 pub mod mppa;
 
 mod argument;
 mod context;
 
 pub use self::argument::Argument;
-pub use self::context::{Context, AsyncCallback, AsyncEvaluator};
-
+pub use self::context::{AsyncCallback, AsyncEvaluator, Context};
 use codegen::Function;
 use ir;
-use search_space::{SearchSpace, DimKind};
+use model::{HwPressure, Nesting};
+use search_space::{DimKind, SearchSpace};
 use std::hash;
 use std::io::Write;
-use model::{HwPressure, Nesting};
 use utils::*;
 
 // TODO(perf): in PTX, shared and local pointers can have a 32-bit size, even in 64-bit
@@ -44,12 +43,15 @@ pub trait Device: Sync {
     /// Returns the name of the device.
     fn name(&self) -> &str;
 
-    /// Returns the pressure cause by a `BasicBlock`. For a dimension, returns the pressure
-    /// for the full loop execution.
-    fn hw_pressure(&self, space: &SearchSpace,
-                   dim_sizes: &HashMap<ir::dim::Id, u32>,
-                   nesting: &HashMap<ir::BBId, Nesting>,
-                   bb: &ir::BasicBlock) -> HwPressure;
+    /// Returns the pressure cause by a `BasicBlock`. For a dimension, returns the
+    /// pressure for the full loop execution.
+    fn hw_pressure(
+        &self,
+        space: &SearchSpace,
+        dim_sizes: &HashMap<ir::dim::Id, u32>,
+        nesting: &HashMap<ir::BBId, Nesting>,
+        bb: &ir::BasicBlock,
+    ) -> HwPressure;
     /// Returns the pressure produced by a single iteration of a loop and the latency
     /// overhead of iterations.
     fn loop_iter_pressure(&self, kind: DimKind) -> (HwPressure, HwPressure);

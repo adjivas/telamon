@@ -1,8 +1,9 @@
 ///! Defines the CUDA evaluation context.
 use crossbeam;
 use device;
-use device::{Device, Argument};
-use device::cuda::{ArrayArg, Executor, Gpu, Kernel, JITDaemon};
+use device::{Argument, Device};
+use device::context::AsyncCallback;
+use device::cuda::{ArrayArg, Executor, Gpu, JITDaemon, Kernel};
 use device::cuda::kernel::Thunk;
 use explorer;
 use ir;
@@ -10,8 +11,6 @@ use std;
 use std::f64;
 use std::sync::{atomic, mpsc};
 use utils::*;
-use device::context::AsyncCallback;
-
 
 //use std::boxed::FnBox;
 /// Max number of candidates waiting to be evaluated.
@@ -35,14 +34,20 @@ impl<'a> Context<'a> {
                 parameters: HashMap::default(),
             }
         } else {
-            panic!("Unknown gpu model: {}, \
-                   please add it to devices/cuda_gpus.json.", gpu_name);
+            panic!(
+                "Unknown gpu model: {}, please add it to devices/cuda_gpus.json.",
+                gpu_name
+            );
         }
     }
 
     /// Creates a context from the given GPU.
     pub fn from_gpu(gpu: Gpu, executor: &'a Executor) -> Self {
-        Context { gpu_model: gpu, executor, parameters: HashMap::default() }
+        Context {
+            gpu_model: gpu,
+            executor,
+            parameters: HashMap::default(),
+        }
     }
 
     /// Returns the GPU description.
@@ -71,8 +76,12 @@ impl<'a> device::Context<'a> for Context<'a> {
         Ok(kernel.evaluate(self)? as f64 / self.gpu_model.smx_clock)
     }
 
-    fn async_eval<'b, 'c>(&self, num_workers: usize,
-                          inner: &(Fn(&mut device::AsyncEvaluator<'b, 'c>) + Sync)){
+    fn async_eval<'b, 'c>(
+        &self,
+        num_workers: usize,
+        inner: &(Fn(&mut device::AsyncEvaluator<'b, 'c>) + Sync),
+    )
+    {
         // Setup the evaluator.
         let blocked_time = &atomic::AtomicUsize::new(0);
         let (send, recv) = mpsc::sync_channel(EVAL_BUFFER_SIZE);
@@ -87,8 +96,12 @@ impl<'a> device::Context<'a> for Context<'a> {
                     ptx_daemon: self.executor.spawn_jit(),
                     blocked_time,
                 };
-                unwrap!(scope.builder().name("Telamon - Explorer Thread".to_string())
-                        .spawn(move || inner(&mut evaluator)));
+                unwrap!(
+                    scope
+                        .builder()
+                        .name("Telamon - Explorer Thread".to_string())
+                        .spawn(move || inner(&mut evaluator))
+                );
             }
             // Start the evaluation thread.
             let eval_thread_name = "Telamon - GPU Evaluation Thread".to_string();
@@ -97,7 +110,10 @@ impl<'a> device::Context<'a> for Context<'a> {
                 let mut best_eval = std::f64::INFINITY;
                 while let Ok((candidate, thunk, callback)) = recv.recv() {
                     cpt_candidate += 1;
-                    debug!("IN EVALUATOR: evaluating candidate for actions {:?}", candidate.actions);
+                    debug!(
+                        "IN EVALUATOR: evaluating candidate for actions {:?}",
+                        candidate.actions
+                    );
                     //let eval = thunk.execute() as f64 / clock_rate;
                     let eval = if candidate.bound.value() < best_eval {
                         thunk.execute().map(|t| t as f64 / clock_rate)
@@ -106,14 +122,18 @@ impl<'a> device::Context<'a> for Context<'a> {
                         Ok(std::f64::INFINITY)
                     };
                     let eval = eval.unwrap_or_else(|()| {
-                        panic!("evaluation failed for actions {:?}, with kernel {:?}",
-                               candidate.actions, thunk)
+                        panic!(
+                            "evaluation failed for actions {:?}, with kernel {:?}",
+                            candidate.actions, thunk
+                        )
                     });
                     if eval < best_eval {
                         best_eval = eval;
                     }
-                    debug!("IN EVALUATOR: finished evaluating candidate for actions {:?}",
-                           candidate.actions);
+                    debug!(
+                        "IN EVALUATOR: finished evaluating candidate for actions {:?}",
+                        candidate.actions
+                    );
                     callback.call(candidate, eval, cpt_candidate);
                 }
             });
@@ -121,37 +141,60 @@ impl<'a> device::Context<'a> for Context<'a> {
             std::mem::drop(send);
         });
         let blocked_time = blocked_time.load(atomic::Ordering::SeqCst);
-        info!("Total time blocked on `add_kernel`: {:.4e}ns", blocked_time as f64);
+        info!(
+            "Total time blocked on `add_kernel`: {:.4e}ns",
+            blocked_time as f64
+        );
     }
 }
 
-type AsyncPayload<'a, 'b> = (explorer::Candidate<'a>, Thunk<'b>, AsyncCallback<'a, 'b>);
+type AsyncPayload<'a, 'b> = (
+    explorer::Candidate<'a>,
+    Thunk<'b>,
+    AsyncCallback<'a, 'b>,
+);
 
-pub struct AsyncEvaluator<'a, 'b> where 'a: 'b {
+pub struct AsyncEvaluator<'a, 'b>
+where 'a: 'b
+{
     context: &'b Context<'b>,
     sender: mpsc::SyncSender<AsyncPayload<'a, 'b>>,
     ptx_daemon: JITDaemon,
-    blocked_time: &'b atomic::AtomicUsize
+    blocked_time: &'b atomic::AtomicUsize,
 }
 
 impl<'a, 'b, 'c> device::AsyncEvaluator<'a, 'c> for AsyncEvaluator<'a, 'b>
-    where 'a: 'b, 'c: 'b
+where
+    'a: 'b,
+    'c: 'b,
 {
-    fn add_kernel(&mut self, candidate: explorer::Candidate<'a>, callback: device::AsyncCallback<'a, 'c> ) {
+    fn add_kernel(
+        &mut self,
+        candidate: explorer::Candidate<'a>,
+        callback: device::AsyncCallback<'a, 'c>,
+    )
+    {
         let thunk = {
             let dev_fun = device::Function::build(&candidate.space);
             let gpu = &self.context.gpu();
-            debug!("compiling kernel with bound {} and actions {:?}",
-                   candidate.bound, candidate.actions);
+            debug!(
+                "compiling kernel with bound {} and actions {:?}",
+                candidate.bound, candidate.actions
+            );
             // TODO(cc_perf): cuModuleLoadData is waiting the end of any running kernel
             let kernel = Kernel::compile_remote(
-                &dev_fun, gpu, self.context.executor(), &mut self.ptx_daemon);
+                &dev_fun,
+                gpu,
+                self.context.executor(),
+                &mut self.ptx_daemon,
+            );
             kernel.gen_thunk(self.context)
         };
         let t0 = std::time::Instant::now();
         unwrap!(self.sender.send((candidate, thunk, callback)));
         let t = std::time::Instant::now() - t0;
         let t_usize = t.as_secs() as usize * 1_000_000_000 + t.subsec_nanos() as usize;
-        self.blocked_time.fetch_add(t_usize, atomic::Ordering::Relaxed);
+        self.blocked_time
+            .fetch_add(t_usize, atomic::Ordering::Relaxed);
     }
 }
