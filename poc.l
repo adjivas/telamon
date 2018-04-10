@@ -5,11 +5,10 @@
 	#include <stdio.h>
 	#include "token.h"
 
-	#define ECHO
-
 	int lines = 0;
 %}
 
+/* 6 Patterns § http://westes.github.io/flex/manual/Patterns.html#Patterns */
 %%
 ^["/"{2}|"/"{3}].+   { ++lines; return COMMENT; }
 [a-zA-Z][a-zA-Z0-9]* { ++lines; return OTHER; }
@@ -29,14 +28,13 @@ int main(void)
 	// https://westes.github.io/flex/manual/Multiple-Input-Buffers.html
 	YY_BUFFER_STATE buffer_state = yy_scan_string(input, scanner);
 
-	int lex_code;
+	int code;
 	do
         {
-		lex_code = yylex(scanner);
-//		printf("ss %s\n", yyget_text(scanner));
-//		printf("%d: (%d) \n", lines, lex_code);
+		code = yylex(scanner);
+		printf("%d: (%d) -> \"%s\"\n", lines, code, yyget_text(scanner));
 	}
-        while (lex_code != EOF);
+        while (code != EOF);
 
 	yy_delete_buffer(buffer_state, scanner);
 	yylex_destroy(scanner);

@@ -1,13 +1,13 @@
 MAKEFLAGS += -s
 
-TARGET := poc
+TARGET = poc
 
-#  § http://westes.github.io/flex/manual/Makefiles-and-Flex.html#Makefiles-and-Flex
-LEX := flex
+# http://westes.github.io/flex/manual/Makefiles-and-Flex.html#Makefiles-and-Flex
+LEX = flex
 
 # 16.3 Variables for Specifying Commands § https://www.gnu.org/software/make/manual/make.html#Command-Variables
-CFLAGS := -Werror -Wextra -Werror
-ALL_CFLAGS := -I. $(CFLAGS)
+CFLAGS += -Werror -Wextra -Werror
+ALL_CFLAGS = -D ECHO -I. $(CFLAGS)
 
 LDFLAGS += -lfl
 
