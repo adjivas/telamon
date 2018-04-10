@@ -1,7 +1,3 @@
-# Binary
-*
-!*.*
-
 # Swap
 *.swp
 *.rs.swp
@@ -11,7 +7,7 @@
 
 # Lib
 *.a
-a*.so
+*.so
 
 # Cargo
 /target/
