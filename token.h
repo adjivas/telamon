@@ -1,0 +1,4 @@
+enum token {
+	COMMENT,
+	OTHER,
+};
