@@ -17,9 +17,6 @@ all:
 	$(LEX) -o$(TARGET).c $(TARGET).l
 	$(CC) $(ALL_CFLAGS) -o $(TARGET) $(TARGET).c $(LDFLAGS)
 
-indent: $(SOURCE)
-	indent $(INDENTOPT) $^
-
 clean:
 	rm -v -fr $(TARGET).c
 
