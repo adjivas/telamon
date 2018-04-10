@@ -11,16 +11,24 @@ ALL_CFLAGS = -D ECHO -I. $(CFLAGS)
 
 LDFLAGS += -lfl
 
-INDENTOPT = -kr -di 4 -bli0 -bls -sob -bad
+all: static dynamic 
 
-all:
+static: lex
+	$(CC) $(ALL_CFLAGS) -o $(TARGET).o $(TARGET).c $(LDFLAGS)
+	ar rcs $(TARGET).a $(TARGET).o
+
+dynamic: lex
+	$(CC) -fPIC -shared $(ALL_CFLAGS) -o $(TARGET).so $(TARGET).c $(LDFLAGS)
+
+lex:
 	$(LEX) -o$(TARGET).c $(TARGET).l
-	$(CC) $(ALL_CFLAGS) -o $(TARGET) $(TARGET).c $(LDFLAGS)
 
 clean:
+	rm -v -fr $(TARGET).o
 	rm -v -fr $(TARGET).c
 
 fclean: clean
-	rm -v -fr $(TARGET)
+	rm -v -fr $(TARGET).a
+	rm -v -fr $(TARGET).so
 
 re: fclean all
