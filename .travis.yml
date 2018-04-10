@@ -1,10 +1,19 @@
-language: c
+language: rust
 
-compiler:
-  - gcc
+rust:
+  - stable
 
-before_install:
- - sudo apt-get update -qq
- - sudo apt-get install -qq flex
+os:
+  - osx
+  - linux
 
-script: make
+addons:
+  apt:
+    packages:
+      - flex
+
+before_script:
+  - flex --version
+
+script:
+  - cargo build
