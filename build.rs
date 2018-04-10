@@ -1,11 +1,15 @@
+extern crate cc;
+
 use std::process::Command;
 
 fn main() {
-	Command::new("make")
-		.arg("-C")
-		.arg(env!("CARGO_MANIFEST_DIR"))
-		.arg("static")
-		.arg("clean")
+	Command::new("flex")
+		.arg("-opoc.c")
+		.arg("src/poc.l")
                 .status()
-                .expect("failed to execute process");
+                .expect("failed to execute Flex's process");
+
+	cc::Build::new()
+        	.file("poc.c")
+	        .compile("poc.a");
 }
