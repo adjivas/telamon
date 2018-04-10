@@ -19,3 +19,6 @@ doctest = true
 
 [build-dependencies.cc]
 version = "1.0"
+
+[dependencies.libc]
+version = "0.2"
