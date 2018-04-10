@@ -21,7 +21,7 @@ dynamic: lex
 	$(CC) -fPIC -shared $(ALL_CFLAGS) -o $(TARGET).so $(TARGET).c $(LDFLAGS)
 
 lex:
-	$(LEX) -o$(TARGET).c $(TARGET).l
+	$(LEX) -o$(TARGET).c src/$(TARGET).l
 
 clean:
 	rm -v -fr $(TARGET).o

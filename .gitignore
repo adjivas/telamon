@@ -4,6 +4,15 @@
 
 # Swap
 *.swp
+*.rs.swp
 
 # F/lex
 *.c
+
+# Lib
+*.a
+a*.so
+
+# Cargo
+/target/
+Cargo.lock

@@ -1,0 +1,18 @@
+[package]
+name = "poc"
+version = "0.1.0"
+description = "A proof of concept."
+authors = [
+    "adjivas <adjivas@users.noreply.github.com>",
+]
+readme = "README.md"
+build = "build.rs"
+
+[[bin]]
+name = "poc"
+doc  = false
+test = false
+
+[lib]
+test = false
+doctest = true
