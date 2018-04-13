@@ -15,5 +15,5 @@ addons:
 before_script:
   - flex --version
 
-script:
-  - cargo build
+#script:
+#  -  cargo build
