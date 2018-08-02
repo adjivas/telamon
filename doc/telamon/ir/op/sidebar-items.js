@@ -1,1 +1,0 @@
-initSidebarItems({"enum":[["Rounding","The rounding mode of an arithmetic operation."]]});

@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["Map","Represents a mapping between dimenions."]]});

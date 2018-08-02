@@ -1,1 +1,0 @@
-initSidebarItems({"struct":[["Id","Provides a unique identifier for iteration dimensions."],["Map","Represents a mapping between dimenions."]]});
