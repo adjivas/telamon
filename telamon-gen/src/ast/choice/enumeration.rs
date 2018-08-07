@@ -175,7 +175,7 @@ impl EnumDef {
             match self.variables.as_slice() {
                 [VarDef { name: _, set: SetRef { name, .. } },
                  VarDef { name: _, set: SetRef { name: rhs_name, .. } }] => {
-                    if name != rhs_name {
+                    if name.data != rhs_name.data {
                         Err(TypeError::BadSymmetricArg {
                             object_name: self.name.to_owned(),
                             object_variables: self.variables.to_owned()

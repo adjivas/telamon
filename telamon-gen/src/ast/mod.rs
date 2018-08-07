@@ -81,6 +81,7 @@ impl Statement {
         match self {
             Statement::SetDef(def) => def.declare(context),
             Statement::ChoiceDef(def) => def.declare(context),
+            Statement::Require(def) => def.declare(context),
             _ => Ok(()),
         }
     }
@@ -89,6 +90,7 @@ impl Statement {
         match self {
             Statement::SetDef(def) => def.define(context),
             Statement::ChoiceDef(def) => def.define(context),
+            Statement::Require(def) => def.define(context),
             _ => Ok(()),
         }
     }
@@ -145,7 +147,7 @@ pub enum Symmetry { Symmetric, AntiSymmetric(Vec<(RcStr, RcStr)>) }
 /// References a set.
 #[derive(Clone, Debug)]
 pub struct SetRef {
-    pub name: RcStr,
+    pub name: Spanned<RcStr>,
     pub var: Option<RcStr>,
 }
 
@@ -157,7 +159,7 @@ impl PartialEq for SetRef {
 
 impl SetRef {
     fn type_check(&self, ir_desc: &ir::IrDesc, var_map: &VarMap) -> ir::Set {
-        let set_def = ir_desc.get_set_def(&self.name);
+        let set_def = ir_desc.get_set_def(&self.name.data);
         let var = if let Some(ref var) = self.var {
             Some(var_map.type_check(var, set_def.arg().unwrap()))
         } else {

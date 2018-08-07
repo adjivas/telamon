@@ -199,7 +199,10 @@ impl TypingContext {
         // Add the constraint `item in set => repr is TRUE`.
         let quotient_item_def = VarDef {
             name: item_name,
-            set: SetRef { name: set.name().clone(), var: arg_name.map(|n| n.data) }
+            set: SetRef { name: Spanned {
+                data: set.name().clone(),
+                ..Default::default()
+            }, var: arg_name.map(|n| n.data) }
         };
         let item_in_set_foralls = arg.into_iter()
             .chain(std::iter::once(quotient_item_def)).collect();
@@ -249,7 +252,10 @@ impl TypingContext {
         });
         let rhs_name = RcStr::new(format!("{}_repr", item_name));
         let rhs_set = SetRef {
-            name: set_name,
+            name: Spanned {
+                data: set_name,
+                ..Default::default()
+            },
             var: arg.as_ref().map(|d| d.name.data.clone())
         };
         let equiv_choice = ChoiceInstance {

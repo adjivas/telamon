@@ -40,6 +40,22 @@ impl CheckerContext {
         }
     }
 
+    pub fn check_require_define(
+        &self,
+        variables: &Vec<VarDef>,
+        conditions: &Vec<Vec<Condition>>,
+    ) -> Result<(), TypeError> {
+        for var in variables.iter() {
+            let name: String = var.set.name.data.to_owned().to_string();
+            if !self.hash_set.contains_key(&name) {
+                Err(TypeError::Undefined {
+                    object_name: var.set.name.with_data(name.to_owned())
+                })?;
+            }
+        }
+        Ok(())
+    }
+
     /// This checks the undefined of SetDef superset and arg.
     pub fn check_set_define(
         &self,
@@ -48,7 +64,7 @@ impl CheckerContext {
         field_superset: &Option<SetRef>,
     ) -> Result<(), TypeError> {
         if let Some(VarDef { name: _, set: SetRef { name, .. } }) = field_arg {
-            let name: &String = name.deref();
+            let name: &String = name.data.deref();
             if !self.hash_set.contains_key(name) {
                 Err(TypeError::Undefined {
                     object_name: object_name.with_data(name.to_owned()),
@@ -56,7 +72,7 @@ impl CheckerContext {
             }
         }
         if let Some(SetRef { name: supername, .. }) = field_superset {
-            let name: &String = supername.deref();
+            let name: &String = supername.data.deref();
             if !self.hash_set.contains_key(name) {
                 Err(TypeError::Undefined {
                     object_name: object_name.with_data(name.to_owned()),
@@ -73,7 +89,7 @@ impl CheckerContext {
         field_variables: &Vec<VarDef>,
     ) -> Result<(), TypeError> {
         for VarDef { name: _, set: SetRef { name, .. } } in field_variables {
-            let name: &String = name.deref();
+            let name: &String = name.data.deref();
             if !self.hash_set.contains_key(name) {
                 Err(TypeError::Undefined {
                     object_name: object_name.with_data(name.to_owned()),

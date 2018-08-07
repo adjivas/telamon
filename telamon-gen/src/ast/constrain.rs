@@ -33,4 +33,19 @@ impl Constraint {
             }
         }).collect_vec()
     }
+
+    pub fn check_variables_set(&self) -> Result<(), TypeError> {
+        Ok(())
+    }
+
+    /// Type checks the declare's condition.
+    pub fn declare(&self, context: &mut CheckerContext) -> Result<(), TypeError> {
+        Ok(())
+    }
+
+    /// Type checks the define's condition.
+    pub fn define(&self, context: &CheckerContext) -> Result<(), TypeError> {
+        context.check_require_define(&self.forall_vars, &self.disjunctions)?;
+        Ok(())
+    }
 }
