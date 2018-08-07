@@ -59,6 +59,10 @@ rc_var: RcStr = {
     <name: var> => RcStr::new(name),
 };
 
+rc_set_ident: RcStr = {
+    <name: set_ident> => RcStr::new(name),
+};
+
 var_def: ast::VarDef = {
     <spanned_name: spanned<rc_var>> in_ <set: set_ref> => {
         ast::VarDef { name: spanned_name, set }
@@ -66,8 +70,8 @@ var_def: ast::VarDef = {
 };
 
 set_ref: ast::SetRef = {
-    <name: set_ident> <var: ("(" <var> ")")?> => {
-        ast::SetRef { name: RcStr::new(name), var: var.map(RcStr::new) }
+    <spanned_name: spanned<rc_set_ident>> <var: ("(" <var> ")")?> => {
+        ast::SetRef { name: spanned_name, var: var.map(RcStr::new) }
     }
 };
 
