@@ -360,7 +360,13 @@ mod parameter {
                                 data: RcStr::new(String::from("lhs"))
                             },
                             set: SetRef {
-                                name: RcStr::new(String::from("BasicBlock")),
+                                name: Spanned {
+                                    beg: Position::new_optional(
+                                            LexerPosition::new(9, 42), None),
+                                    end: Position::new_optional(
+                                            LexerPosition::new(9, 52), None),
+                                    data: RcStr::new(String::from("BasicBlock")),
+                                },
                                 var: None
                             }
                         }
@@ -413,7 +419,13 @@ mod parameter {
                             data: RcStr::new(String::from("lhs"))
                         },
                         set: SetRef {
-                            name: RcStr::new(String::from("BasicBlock")),
+                            name: Spanned {
+                                beg: Position::new_optional(LexerPosition::new(18, 42),
+                                    None),
+                                end: Position::new_optional(LexerPosition::new(18, 52),
+                                    None),
+                                data: RcStr::new(String::from("BasicBlock")),
+                            },
                             var: None
                         }
                     },
@@ -426,7 +438,13 @@ mod parameter {
                             data: RcStr::new(String::from("rhs"))
                         },
                         set: SetRef {
-                            name: RcStr::new(String::from("BasicBlock2")),
+                            name: Spanned {
+                                beg: Position::new_optional(LexerPosition::new(18, 62),
+                                    None),
+                                end: Position::new_optional(LexerPosition::new(18, 73),
+                                    None),
+                                data: RcStr::new(String::from("BasicBlock2")),
+                            },
                             var: None
                         }
                     }
@@ -488,7 +506,13 @@ mod parameter {
                                 data: RcStr::new(String::from("lhs"))
                             },
                             set: SetRef {
-                                name: RcStr::new(String::from("BasicBlock")),
+                                name: Spanned {
+                                    beg: Position::new_optional(
+                                        LexerPosition::new(9, 42), None),
+                                    end: Position::new_optional(
+                                        LexerPosition::new(9, 52), None),
+                                    data: RcStr::new(String::from("BasicBlock")),
+                                },
                                 var: None
                             }
                         }
@@ -528,7 +552,13 @@ mod parameter {
                                 data: RcStr::new(String::from("lhs"))
                             },
                             set: SetRef {
-                                name: RcStr::new(String::from("BasicBlock")),
+                                name: Spanned {
+                                    beg: Position::new_optional(
+                                            LexerPosition::new(9, 42), None),
+                                    end: Position::new_optional(
+                                            LexerPosition::new(9, 52), None),
+                                    data: RcStr::new(String::from("BasicBlock")),
+                                },
                                 var: None
                             }
                         },
@@ -541,7 +571,13 @@ mod parameter {
                                 data: RcStr::new(String::from("chs"))
                             },
                             set: SetRef {
-                                name: RcStr::new(String::from("BasicBlock")),
+                                name: Spanned {
+                                    beg: Position::new_optional(
+                                            LexerPosition::new(10, 42), None),
+                                    end: Position::new_optional(
+                                            LexerPosition::new(10, 52), None),
+                                    data: RcStr::new(String::from("BasicBlock")),
+                                },
                                 var: None
                             }
                         },
@@ -554,7 +590,13 @@ mod parameter {
                                 data: RcStr::new(String::from("rhs"))
                             },
                             set: SetRef {
-                                name: RcStr::new(String::from("BasicBlock")),
+                                name: Spanned {
+                                    beg: Position::new_optional(
+                                            LexerPosition::new(11, 42), None),
+                                    end: Position::new_optional(
+                                            LexerPosition::new(11, 52), None),
+                                    data: RcStr::new(String::from("BasicBlock")),
+                                },
                                 var: None
                             }
                         },
@@ -606,7 +648,13 @@ mod parameter {
                                 data: RcStr::new(String::from("lhs"))
                             },
                             set: SetRef {
-                                name: RcStr::new(String::from("BasicBlock")),
+                                name: Spanned {
+                                    beg: Position::new_optional(
+                                            LexerPosition::new(18, 42), None),
+                                    end: Position::new_optional(
+                                            LexerPosition::new(18, 52), None),
+                                    data: RcStr::new(String::from("BasicBlock")),
+                                },
                                 var: None
                             }
                         },
@@ -619,7 +667,13 @@ mod parameter {
                                 data: RcStr::new(String::from("rhs"))
                             },
                             set: SetRef {
-                                name: RcStr::new(String::from("BasicBlock2")),
+                                name: Spanned {
+                                    beg: Position::new_optional(
+                                            LexerPosition::new(18, 62), None),
+                                    end: Position::new_optional(
+                                            LexerPosition::new(18, 73), None),
+                                    data: RcStr::new(String::from("BasicBlock2")),
+                                },
                                 var: None
                             }
                         }
@@ -651,16 +705,16 @@ fn conflict() {
             value A:
             value B:
           end".to_vec())).unwrap().type_check().err(),
-        Some(TypeError::Conflict {
-            object_fields: (Spanned {
-                beg: Position::new_optional(LexerPosition::new(10, 12), None),
-                end: Position::new_optional(LexerPosition::new(10, 21), None),
-                data: String::from("Symmetric"),
-            }, Spanned {
-                beg: Position::new_optional(LexerPosition::new(11, 12), None),
-                end: Position::new_optional(LexerPosition::new(12, 20), None),
-                data: String::from("Antisymmetric"),
-            })
-        })
-    )
+                Some(TypeError::Conflict {
+                    object_fields: (Spanned {
+                        beg: Position::new_optional(LexerPosition::new(10, 12), None),
+                        end: Position::new_optional(LexerPosition::new(10, 21), None),
+                        data: String::from("Symmetric"),
+                    }, Spanned {
+                        beg: Position::new_optional(LexerPosition::new(11, 12), None),
+                        end: Position::new_optional(LexerPosition::new(12, 20), None),
+                        data: String::from("Antisymmetric"),
+                    })
+                })
+    );
 }
