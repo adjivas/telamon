@@ -264,7 +264,7 @@ impl Condition {
             Condition::Code(code, negate) =>
                 ir::Condition::Code { code: type_check_code(code, var_map), negate },
             Condition::Is { lhs, rhs, is } => {
-                let choice = ir_desc.get_choice(&lhs.name);
+                let choice = ir_desc.get_choice(&lhs.name.data);
                 let enum_ = ir_desc.get_enum(choice.choice_def().as_enum().unwrap());
                 let input_id = add_input(lhs, ir_desc, var_map, inputs);
                 ir::Condition::Enum {
@@ -275,7 +275,7 @@ impl Condition {
                 }
             },
             Condition::CmpCode { lhs, rhs, op } => {
-                let choice = ir_desc.get_choice(&lhs.name);
+                let choice = ir_desc.get_choice(&lhs.name.data);
                 choice.choice_def().is_valid_operator(op);
                 if let ir::ChoiceDef::Enum(..) = *choice.choice_def() {
                     panic!("enums cannot be compared to host code");
@@ -287,8 +287,8 @@ impl Condition {
                 }
             },
             Condition::CmpInput { lhs, rhs, op } => {
-                assert_eq!(lhs.name, rhs.name);
-                let choice = ir_desc.get_choice(&lhs.name);
+                assert_eq!(lhs.name.data, rhs.name.data);
+                let choice = ir_desc.get_choice(&lhs.name.data);
                 let lhs_input = add_input(lhs, ir_desc, var_map, inputs);
                 let rhs_input = add_input(rhs, ir_desc, var_map, inputs);
                 assert!(choice.choice_def().is_valid_operator(op));
@@ -319,29 +319,29 @@ impl Condition {
 /// Typecheck and adds an input to the inputs vector.
 fn add_input(choice: ChoiceInstance, ir_desc: &ir::IrDesc, var_map: &VarMap,
              inputs: &mut Vec<ir::ChoiceInstance>) -> usize {
-    let choice_def = ir_desc.get_choice(&choice.name);
+    let choice_def = ir_desc.get_choice(&choice.name.data);
     let vars = choice.vars.iter().zip_eq(choice_def.arguments().sets())
         .map(|(v, expected_t)| var_map.type_check(v, expected_t))
         .collect();
     let input_id = inputs.len();
-    inputs.push(ir::ChoiceInstance { choice: choice.name, vars: vars });
+    inputs.push(ir::ChoiceInstance { choice: choice.name.data, vars: vars });
     input_id
 }
 
 /// A reference to a choice instantiated with the given variables.
 #[derive(Debug, Clone)]
 pub struct ChoiceInstance {
-    pub name: RcStr,
+    pub name: Spanned<RcStr>,
     pub vars: Vec<RcStr>,
 }
 
 impl ChoiceInstance {
     /// Type check the choice instance.
     fn type_check(&self, ir_desc: &ir::IrDesc, var_map: &VarMap) -> ir::ChoiceInstance {
-        let choice = ir_desc.get_choice(&self.name);
+        let choice = ir_desc.get_choice(&self.name.data);
         let vars = self.vars.iter().zip_eq(choice.arguments().sets())
             .map(|(v, s)| var_map.type_check(v, s)).collect();
-        ir::ChoiceInstance { choice: self.name.clone(), vars }
+        ir::ChoiceInstance { choice: self.name.data.to_owned(), vars }
     }
 }
 

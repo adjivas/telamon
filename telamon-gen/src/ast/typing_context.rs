@@ -40,6 +40,7 @@ impl CheckerContext {
         }
     }
 
+    /// TODO: https://github.com/ulysseB/telamon/blob/41fbbf33a091106988b623ab4f76f1a33bb3ee0f/src/search_space/choices.exh#L83
     pub fn check_require_define(
         &self,
         variables: &Vec<VarDef>,
@@ -51,6 +52,23 @@ impl CheckerContext {
                 Err(TypeError::Undefined {
                     object_name: var.set.name.with_data(name.to_owned())
                 })?;
+            }
+        }
+        for conds in conditions.iter() {
+            for cond in conds {
+                match cond {
+                    Condition::Is {
+                        lhs: ChoiceInstance { name: enumeration, .. }, rhs, ..
+                    } => {
+                        let name: String = enumeration.data.to_owned().to_string();
+                        if !self.hash_choice.contains_key(&name) {
+                            Err(TypeError::Undefined {
+                                object_name: enumeration.with_data(name.to_owned())
+                            })?;
+                        }
+                    },
+                    _ => {},
+                }
             }
         }
         Ok(())

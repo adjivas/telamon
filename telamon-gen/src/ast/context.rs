@@ -56,7 +56,7 @@ impl TypingContext {
                     self.register_enum(name.data, doc, variables, statements),
                 ChoiceDef::CounterDef(CounterDef { name, doc, visibility,
                     vars, body, }) =>
-                    self.register_counter(name.data, doc, visibility, vars, body),
+                    self.register_counter(name, doc, visibility, vars, body),
                 ChoiceDef::IntegerDef(def) => self.define_integer(def),
             }
         }
@@ -141,26 +141,27 @@ impl TypingContext {
         assert!(set.attributes().contains_key(&ir::SetDefKey::AddToSet));
         let repr_name = quotient.representant;
         // Create decisions to back the quotient set
-        self.create_repr_choice(repr_name.clone(), set, arg.clone(),
+        self.create_repr_choice(repr_name.to_owned(), set, arg.clone(),
                                 quotient.item.name.clone());
         let item_name = quotient.item.name.clone();
         let arg_name = arg.as_ref().map(|x| x.name.clone());
         let forall_vars = arg.clone().into_iter()
             .chain(std::iter::once(quotient.item)).collect_vec();
         let counter_name = self.create_repr_counter(
-            set.name().clone(), &repr_name, arg.clone(), item_name.data.clone(),
+            set.name().clone(), &repr_name, arg.clone(), item_name.clone(),
             forall_vars.clone(),
-            RcStr::new(quotient.equiv_relation.0),
+            Spanned {
+                data: RcStr::new(quotient.equiv_relation.0), ..Default::default() },
             quotient.equiv_relation.1);
         // Generate the code that set an item as representant.
         let trigger_code = print::add_to_quotient(
-            set, &repr_name, &counter_name, &item_name.data,
+            set, &repr_name, &counter_name.data, &item_name.data,
             &arg_name.clone().map(|n| n.data)
         );
         // Constraint the representative value.
         let forall_names = forall_vars.iter().map(|x| x.name.clone()).collect_vec();
         let repr_instance = ChoiceInstance {
-            name: repr_name,
+            name: Spanned { data: repr_name, ..Default::default() },
             vars: forall_names.iter()
                               .map(|n| n.data.clone())
                               .collect::<Vec<_>>()
@@ -242,15 +243,15 @@ impl TypingContext {
     fn create_repr_counter(&mut self, set_name: RcStr,
                            repr_name: &str,
                            arg: Option<VarDef>,
-                           item_name: RcStr,
+                           item_name: Spanned<RcStr>,
                            vars: Vec<VarDef>,
-                           equiv_choice_name: RcStr,
-                           equiv_values: Vec<RcStr>) -> RcStr {
+                           equiv_choice_name: Spanned<RcStr>,
+                           equiv_values: Vec<RcStr>) -> Spanned<RcStr> {
         // Create the increment condition
         self.checks.push(Check::IsSymmetric {
-            choice: equiv_choice_name.clone(), values: equiv_values.clone()
+            choice: equiv_choice_name.data.clone(), values: equiv_values.clone()
         });
-        let rhs_name = RcStr::new(format!("{}_repr", item_name));
+        let rhs_name = RcStr::new(format!("{}_repr", item_name.data));
         let rhs_set = SetRef {
             name: Spanned {
                 data: set_name,
@@ -260,7 +261,7 @@ impl TypingContext {
         };
         let equiv_choice = ChoiceInstance {
             name: equiv_choice_name,
-            vars: vec![item_name, rhs_name.clone()],
+            vars: vec![item_name.data, rhs_name.clone()],
         };
         let condition = Condition::Is { lhs: equiv_choice, rhs: equiv_values, is: true };
         // Create the counter.
@@ -280,7 +281,7 @@ impl TypingContext {
         self.choice_defs.push(ChoiceDef::CounterDef(CounterDef {
             name: Spanned { data: name.clone(), ..Default::default() }, doc: None, visibility, vars, body,
         }));
-        name
+        Spanned { data: name.clone(), ..Default::default() }
     }
 
     /// Registers an enum definition.
@@ -378,9 +379,11 @@ impl TypingContext {
             args.iter().map(|def| def.name.clone())
                        .collect::<Vec<_>>();
         let self_instance = ChoiceInstance {
-            name: choice, vars: choice_args.into_iter()
-                                           .map(|n| n.data)
-                                           .collect::<Vec<_>>()
+            name: Spanned {
+                data: choice, ..Default::default()
+            }, vars: choice_args.into_iter()
+                                .map(|n| n.data)
+                                .collect::<Vec<_>>()
         };
         let condition = Condition::Is { lhs: self_instance, rhs: vec![value], is: false };
         constraint.forall_vars.extend(args);
@@ -392,12 +395,12 @@ impl TypingContext {
 
     /// Registers a counter in the ir description.
     fn register_counter(&mut self,
-                        counter_name: RcStr,
+                        counter_name: Spanned<RcStr>,
                         doc: Option<String>,
                         visibility: ir::CounterVisibility,
                         untyped_vars: Vec<VarDef>,
                         body: CounterBody) {
-        trace!("defining counter {}", counter_name);
+        trace!("defining counter {}", counter_name.data);
         let mut var_map = VarMap::default();
         // Type-check the base.
         let kind = body.kind;
@@ -412,7 +415,7 @@ impl TypingContext {
         }).collect_vec();
         let doc = doc.map(RcStr::new);
         let (incr, incr_condition) = self.gen_increment(
-            &counter_name,
+            &counter_name.data,
             vars.iter()
                 .cloned()
                 .map(|(n, s)| (n.data, s))
@@ -431,14 +434,14 @@ impl TypingContext {
             CounterVal::Choice(counter) => {
                 let counter_name = counter_name.clone();
                 let (value, action) = self.counter_val_choice(
-                    &counter, visibility, counter_name, &incr, &incr_condition,
+                    &counter, visibility, counter_name.data, &incr, &incr_condition,
                     kind, vars.len(), &var_map);
-                self.ir_desc.add_onchange(&counter.name, action);
+                self.ir_desc.add_onchange(&counter.name.data, action);
                 value
             },
         };
         let incr_counter = self.gen_incr_counter(
-            &counter_name, vars.len(), &var_map, &incr, &incr_condition, value.clone());
+            &counter_name.data, vars.len(), &var_map, &incr, &incr_condition, value.clone());
         self.ir_desc.add_onchange(&incr.choice, incr_counter);
         // Register the counter choices.
         let incr_iter = iter_vars.iter().map(|p| p.1.clone()).collect_vec();
@@ -449,7 +452,7 @@ impl TypingContext {
                                                         .map(|(n, s)| (n.data, s))
                                                         .collect(), false, false);
         let mut counter_choice = ir::Choice::new(
-            counter_name, doc, counter_args, counter_def);
+            counter_name.data, doc, counter_args, counter_def);
         // Filter the counter itself after an update, because the filter actually acts on
         // the increments and depends on the counter value.
         let filter_self = ir::OnChangeAction {
@@ -504,7 +507,9 @@ impl TypingContext {
         self.ir_desc.add_choice(incr_choice);
         // Constraint the boolean to follow the conditions.
         let vars = counter_vars.iter().chain(iter_vars).map(|x| x.0.clone()).collect();
-        let incr_instance = ChoiceInstance { name: name.clone(), vars };
+        let incr_instance = ChoiceInstance {
+            name: Spanned { data: name.clone(), ..Default::default() }, vars
+        };
         let is_false = Condition::new_is_bool(incr_instance, false);
         let mut disjunctions = conditions.iter().map(|cond| {
             vec![cond.clone(), is_false.clone()]
@@ -536,7 +541,7 @@ impl TypingContext {
         var_map: &VarMap
     ) -> (ir::CounterVal, ir::OnChangeAction) {
         // TODO(cleanup): do not force an ordering on counter declaration.
-        let value_choice = self.ir_desc.get_choice(&counter.name);
+        let value_choice = self.ir_desc.get_choice(&counter.name.data);
         match *value_choice.choice_def() {
             ir::ChoiceDef::Counter { visibility, kind: value_kind, .. } => {
                 // TODO(cleanup): allow mul of sums. The problem is that you can multiply

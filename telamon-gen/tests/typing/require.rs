@@ -48,7 +48,6 @@ mod undefined {
     }
 
     #[test]
-    #[ignore]
     fn enumeration() {
         assert_eq!(parser::parse_ast(Lexer::new(
             b"set Instruction:
@@ -82,8 +81,8 @@ mod undefined {
             ".to_vec())).unwrap().type_check().err(),
             Some(TypeError::Undefined {
                 object_name: Spanned {
-                    beg: Position::new_optional(LexerPosition::new(10, 16), None),
-                    end: Position::new_optional(LexerPosition::new(11, 24), None),
+                    beg: Position::new_optional(LexerPosition::new(27, 42), None),
+                    end: Position::new_optional(LexerPosition::new(27, 45), None),
                     data: String::from("foo"),
                 }
             })
