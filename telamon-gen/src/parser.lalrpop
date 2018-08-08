@@ -141,9 +141,9 @@ condition: ast::Condition = {
 };
 
 choice_instance: ast::ChoiceInstance = {
-    <name: choice_ident> "(" <vars: list<var, ",">> ")" => {
+    <spanned_name: spanned<rc_choice_ident>> "(" <vars: list<var, ",">> ")" => {
         let vars = vars.into_iter().map(RcStr::new).collect();
-        ast::ChoiceInstance { name: RcStr::new(name), vars: vars }
+        ast::ChoiceInstance { name: spanned_name, vars: vars }
     },
 };
 
