@@ -26,6 +26,7 @@ jobs:
     - script: cd telamon-gen/cc_tests && cargo test
     - script: cd kernels && cargo test --release
     - script: cd telamon-gen && LEX="flex" cargo build --features "lex"
+    - script: rustup component add rustfmt-preview && cargo fmt --all -- --check
     - stage: documentation
       if: branch IN (master, staging)
       script: cargo doc --no-deps --all
