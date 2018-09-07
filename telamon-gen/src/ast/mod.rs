@@ -45,6 +45,7 @@ impl Ast {
     pub fn type_check(self) -> Result<(ir::IrDesc, Vec<TypedConstraint>), TypeError> {
         let mut checker = CheckerContext::default();
         let mut context = TypingContext::default();
+        let mut ir_desc: ir::IrDesc = Default::default();
 
         // declare
         for statement in self.statements.iter() {
@@ -52,13 +53,13 @@ impl Ast {
         }
         // define
         for statement in self.statements.iter() {
-            statement.define(&mut checker)?;
+            statement.define(&mut checker, &mut ir_desc)?;
         }
         // typing context
         for statement in self.statements {
             context.add_statement(statement);
         }
-        Ok(context.finalize())
+        Ok(context.finalize(ir_desc))
     }
 }
 
@@ -84,9 +85,11 @@ impl Statement {
         }
     }
 
-    pub fn define(&self, context: &mut CheckerContext) -> Result<(), TypeError> {
+    pub fn define(
+        &self, context: &mut CheckerContext, ir_desc: &mut ir::IrDesc
+    ) -> Result<(), TypeError> {
         match self {
-            Statement::SetDef(def) => def.define(context),
+            Statement::SetDef(def) => def.define(context, ir_desc),
             Statement::ChoiceDef(def) => def.define(context),
             _ => Ok(()),
         }

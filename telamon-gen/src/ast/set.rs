@@ -99,12 +99,267 @@ impl SetDef {
         context.declare_set(self.name.to_owned())
     }
 
+    /// Creates a boolean choice that indicates if an object represents a givne class.
+    fn create_repr_choice(&self,
+        name: RcStr,
+        set: &ir::SetDef,
+        item_name: Spanned<RcStr>,
+        ir_desc: &mut ir::IrDesc,
+    ) {
+        let arg = self.arg.clone();
+        let bool_str: RcStr = "Bool".into();
+        let def = ir::ChoiceDef::Enum(bool_str.clone());
+        let mut vars = Vec::new();
+        if let Some(arg) = self.arg.as_ref() {
+            vars.push((arg.name.clone(), set.arg().unwrap().clone()));
+        }
+        vars.push((item_name, set.superset().unwrap().clone()));
+        let args = ir::ChoiceArguments::new(
+            vars.into_iter().map(|(n, s)| (n.data, s)).collect(),
+            false,
+            false,
+        );
+        let mut repr = ir::Choice::new(name, None, args, def);
+        let false_value_set = std::iter::once("FALSE".into()).collect();
+        repr.add_fragile_values(ir::ValueSet::enum_values(bool_str, false_value_set));
+        ir_desc.add_choice(repr);
+    }
+
+    /// Creates a counter for the number of objects that can represent another object in
+    /// a quotient set. Returns the name of the counter.
+    fn create_repr_counter(
+        &self,
+        set_name: RcStr,
+        repr_name: &str,
+        item_name: RcStr,
+        vars: Vec<VarDef>,
+        equiv_choice_name: RcStr,
+        equiv_values: Vec<RcStr>,
+    ) -> RcStr {
+        let mut choice_defs: Vec<ChoiceDef> = Default::default();
+        let arg = self.arg.clone();
+        let rhs_name = RcStr::new(format!("{}_repr", item_name));
+        let rhs_set = SetRef {
+            name: set_name,
+            var: arg.as_ref().map(|d| d.name.data.clone()),
+        };
+        let equiv_choice = ChoiceInstance {
+            name: equiv_choice_name,
+            vars: vec![item_name, rhs_name.clone()],
+        };
+        let condition = Condition::Is {
+            lhs: equiv_choice,
+            rhs: equiv_values,
+            is: true,
+        };
+        // Create the counter.
+        let name = RcStr::new(format!("{}_class_counter", repr_name));
+        let visibility = ir::CounterVisibility::HiddenMax;
+        let body = CounterBody {
+            base: "0".to_string(),
+            conditions: vec![condition],
+            iter_vars: vec![VarDef {
+                name: Spanned {
+                    data: rhs_name,
+                    beg: Default::default(),
+                    end: Default::default(),
+                },
+                set: rhs_set,
+            }],
+            kind: ir::CounterKind::Add,
+            value: CounterVal::Code("1".to_string()),
+        };
+        choice_defs.push(ChoiceDef::CounterDef(CounterDef {
+            name: Spanned {
+                data: name.clone(),
+                ..Default::default()
+            },
+            doc: None,
+            visibility,
+            vars,
+            body,
+        }));
+        name
+    }
+
+    /// Creates the choices that implement the quotient set.
+    fn create_quotient(
+        &self,
+        set: &ir::SetDef,
+        ir_desc: &mut ir::IrDesc,
+    ) {
+        let mut constraints: Vec<Constraint> = Default::default();
+        let mut triggers: Vec<TriggerDef> = Default::default();
+        let quotient = self.quotient.clone().unwrap();
+
+        // assert!(set.attributes().contains_key(&ir::SetDefKey::AddToSet));
+        let repr_name = quotient.representant;
+        // Create decisions to back the quotient set
+        self.create_repr_choice(
+            repr_name.clone(),
+            set,
+            quotient.item.name.clone(),
+            ir_desc
+        );
+        let item_name = quotient.item.name.clone();
+        let arg_name = self.arg.as_ref().map(|x| x.name.clone());
+        let forall_vars = self.arg
+            .clone()
+            .into_iter()
+            .chain(std::iter::once(quotient.item))
+            .collect_vec();
+        let counter_name = self.create_repr_counter(
+            set.name().clone(),
+            &repr_name,
+            item_name.data.clone(),
+            forall_vars.clone(),
+            RcStr::new(quotient.equiv_relation.0),
+            quotient.equiv_relation.1,
+        );
+        // Generate the code that set an item as representant.
+        let trigger_code = print::add_to_quotient(
+            set,
+            &repr_name,
+            &counter_name,
+            &item_name.data,
+            &arg_name.clone().map(|n| n.data),
+        );
+        // Constraint the representative value.
+        let forall_names = forall_vars.iter().map(|x| x.name.clone()).collect_vec();
+        let repr_instance = ChoiceInstance {
+            name: repr_name,
+            vars: forall_names
+                .iter()
+                .map(|n| n.data.clone())
+                .collect::<Vec<_>>(),
+        };
+        let counter_instance = ChoiceInstance {
+            name: counter_name,
+            vars: forall_names
+                .iter()
+                .map(|n| n.data.clone())
+                .collect::<Vec<_>>(),
+        };
+        let not_repr = Condition::new_is_bool(repr_instance.clone(), false);
+        let counter_leq_zero = Condition::CmpCode {
+            lhs: counter_instance,
+            rhs: "0".into(),
+            op: ir::CmpOp::Leq,
+        };
+        // Add the constraints `repr is FALSE || dividend is true` and
+        // `repr is FALSE || counter <= 0`.
+        let mut disjunctions = quotient
+            .conditions
+            .iter()
+            .map(|c| vec![not_repr.clone(), c.clone()])
+            .collect_vec();
+        disjunctions.push(vec![not_repr, counter_leq_zero.clone()]);
+        let repr_constraints = Constraint::new(forall_vars.clone(), disjunctions);
+        constraints.push(repr_constraints);
+        // Add the constraint `repr is TRUE || counter > 0 || dividend is false`.
+        let repr_true = Condition::new_is_bool(repr_instance, true);
+        let mut counter_gt_zero = counter_leq_zero.clone();
+        counter_gt_zero.negate();
+        let mut repr_true_conditions = vec![repr_true.clone(), counter_gt_zero];
+        for mut cond in quotient.conditions.iter().cloned() {
+            cond.negate();
+            repr_true_conditions.push(cond);
+        }
+        constraints.push(Constraint {
+            forall_vars: forall_vars.clone(),
+            disjunctions: vec![repr_true_conditions],
+            restrict_fragile: false,
+        });
+        // Add the constraint `item in set => repr is TRUE`.
+        let quotient_item_def = VarDef {
+            name: item_name,
+            set: SetRef {
+                name: set.name().clone(),
+                var: arg_name.map(|n| n.data),
+            },
+        };
+        let item_in_set_foralls = self.arg.clone()
+            .into_iter()
+            .chain(std::iter::once(quotient_item_def))
+            .collect();
+        constraints
+            .push(Constraint::new(item_in_set_foralls, vec![vec![repr_true]]));
+        // Generate the trigger that sets the repr to TRUE and add the item to the set.
+        let mut trigger_conds = quotient.conditions;
+        trigger_conds.push(counter_leq_zero);
+        triggers.push(TriggerDef {
+            foralls: forall_vars,
+            conditions: trigger_conds,
+            code: trigger_code,
+        });
+    }
+
     /// Type checks the define's condition.
-    pub fn define(&self, context: &CheckerContext) -> Result<(), TypeError> {
+    pub fn define(
+        &self, context: &CheckerContext, ir_desc: &mut ir::IrDesc
+    ) -> Result<(), TypeError> {
         self.check_undefined_argument(context)?;
         self.check_undefined_superset(context)?;
         self.check_redefinition_key()?;
         self.check_missing_entry()?;
+        
+        trace!("defining set {}", self.name);
+        let mut var_map = VarMap::default();
+        let arg_name = self.arg.as_ref().map(|var| "$".to_string() + &var.name.data);
+        let arg = self.arg
+            .clone()
+            .map(|arg| var_map.decl_argument(&ir_desc, arg));
+        let superset = self.superset.as_ref().map(|set| set.type_check(&ir_desc, &var_map));
+        for disjoint in &self.disjoint {
+            ir_desc.get_set_def(disjoint);
+        }
+        let mut keymap: IndexMap<ir::SetDefKey, String> = IndexMap::default();
+        let mut reverse = None;
+        for (key, var, mut value) in self.keys.iter()
+                                              .map(|(k, v, s)| 
+                                                    (k.data, v, s))
+                                              .collect::<Vec<_>>() {
+            let mut v = value.to_owned();
+            let mut env = key.env();
+
+            // Add the set argument to the environement.
+            if let Some(ref arg_name) = arg_name {
+                // TODO(cleanup): use ir::Code to avoid using a dummy name.
+                // Currently, we may have a collision on the $var name.
+                if key.is_arg_in_env() {
+                    v = v.replace(arg_name, "$var");
+                    env.push("var");
+                }
+            }
+            // Handle the optional forall.
+            if key == ir::SetDefKey::Reverse {
+                let var_def = var.as_ref().unwrap();
+                let var_name = "$".to_string() + &var_def.name.data;
+                v = v.replace(&var_name, "$var");
+                env.push("var");
+            } else {
+                assert!(var.is_none());
+            }
+            if key == ir::SetDefKey::Reverse {
+                let set = var.clone()
+                    .unwrap()
+                    .set
+                    .type_check(&ir_desc, &VarMap::default());
+                assert!(superset.as_ref().unwrap().is_subset_of_def(&set));
+                assert!(std::mem::replace(&mut reverse,
+                        Some((set, value.to_owned()))).is_none());
+            } else {
+                assert!(keymap.insert(key, v).is_none());
+            }
+        }
+        let def = ir::SetDef::new(
+            self.name.data.to_owned(), arg, superset, reverse, keymap,
+            self.disjoint.to_owned()
+        );
+        if let Some(ref quotient) = self.quotient {
+            self.create_quotient(&def, ir_desc);
+        }
+        ir_desc.add_set_def(def);
         Ok(())
     }
 }
