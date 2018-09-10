@@ -43,23 +43,22 @@ impl Ast {
     /// Generate the defintion of choices and the list of constraints.
     /// TODO: remove typing context
     pub fn type_check(self) -> Result<(ir::IrDesc, Vec<TypedConstraint>), TypeError> {
-        let mut checker = CheckerContext::default();
-        let mut context = TypingContext::default();
-        let mut ir_desc: ir::IrDesc = Default::default();
+        let mut context = CheckerContext::default();
+        let mut ir = TypingContext::default();
 
         // declare
         for statement in self.statements.iter() {
-            statement.declare(&mut checker)?;
+            statement.declare(&mut context)?;
         }
         // define
         for statement in self.statements.iter() {
-            statement.define(&mut checker, &mut ir_desc)?;
+            statement.define(&mut context, &mut ir)?;
         }
         // typing context
         for statement in self.statements {
-            context.add_statement(statement);
+            ir.add_statement(statement);
         }
-        Ok(context.finalize(ir_desc))
+        Ok(ir.finalize())
     }
 }
 
@@ -77,19 +76,19 @@ pub enum Statement {
 }
 
 impl Statement {
-    pub fn declare(&self, context: &mut CheckerContext) -> Result<(), TypeError> {
+    pub fn declare(&self, checker: &mut CheckerContext) -> Result<(), TypeError> {
         match self {
-            Statement::SetDef(def) => def.declare(context),
-            Statement::ChoiceDef(def) => def.declare(context),
+            Statement::SetDef(def) => def.declare(checker),
+            Statement::ChoiceDef(def) => def.declare(checker),
             _ => Ok(()),
         }
     }
 
     pub fn define(
-        &self, context: &mut CheckerContext, ir_desc: &mut ir::IrDesc
+        &self, context: &mut CheckerContext, ir: &mut TypingContext
     ) -> Result<(), TypeError> {
         match self {
-            Statement::SetDef(def) => def.define(context, ir_desc),
+            Statement::SetDef(def) => def.define(context, ir),
             Statement::ChoiceDef(def) => def.define(context),
             _ => Ok(()),
         }
@@ -105,7 +104,7 @@ pub struct Quotient {
 }
 
 /// Checks to perform once the statements have been declared.
-enum Check {
+pub enum Check {
     /// Ensures the inverse of the value set is itself.
     IsSymmetric { choice: RcStr, values: Vec<RcStr> },
 }

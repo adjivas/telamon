@@ -4,12 +4,12 @@ use ir::{self, Adaptable};
 
 #[derive(Default)]
 pub struct TypingContext {
-    ir_desc: ir::IrDesc,
+    pub ir_desc: ir::IrDesc,
     set_defs: Vec<SetDef>,
-    choice_defs: Vec<ChoiceDef>,
-    triggers: Vec<TriggerDef>,
-    constraints: Vec<Constraint>,
-    checks: Vec<Check>,
+    pub choice_defs: Vec<ChoiceDef>,
+    pub triggers: Vec<TriggerDef>,
+    pub constraints: Vec<Constraint>,
+    pub checks: Vec<Check>,
 }
 
 impl TypingContext {
@@ -52,21 +52,20 @@ impl TypingContext {
     }
 
     /// Type-checks the statements in the correct order.
-    pub fn finalize(mut self, ir_desc: ir::IrDesc) -> (ir::IrDesc, Vec<TypedConstraint>) {
-        self.ir_desc = ir_desc;
-//        for def in std::mem::replace(&mut self.set_defs, vec![]) {
-//            self.type_set_def(
-//                def.name.data,
-//                def.arg,
-//                def.superset,
-//                def.keys
-//                    .into_iter()
-//                    .map(|(k, v, s)| (k.data, v, s))
-//                    .collect::<Vec<_>>(),
-//                def.disjoint,
-//                def.quotient,
-//            );
-//        }
+    pub fn finalize(mut self) -> (ir::IrDesc, Vec<TypedConstraint>) {
+        //for def in std::mem::replace(&mut self.set_defs, vec![]) {
+        //    self.type_set_def(
+        //        def.name.data,
+        //        def.arg,
+        //        def.superset,
+        //        def.keys
+        //            .into_iter()
+        //            .map(|(k, v, s)| (k.data, v, s))
+        //            .collect::<Vec<_>>(),
+        //        def.disjoint,
+        //        def.quotient,
+        //    );
+        //}
         for choice_def in std::mem::replace(&mut self.choice_defs, vec![]) {
             match choice_def {
                 ChoiceDef::EnumDef(EnumDef {
@@ -101,7 +100,7 @@ impl TypingContext {
         (self.ir_desc, constraints)
     }
 
-    fn type_set_def(
+    pub fn type_set_def(
         &mut self,
         name: String,
         arg_def: Option<VarDef>,
@@ -171,7 +170,7 @@ impl TypingContext {
     }
 
     /// Creates the choices that implement the quotient set.
-    fn create_quotient(
+    pub fn create_quotient(
         &mut self,
         set: &ir::SetDef,
         quotient: Quotient,
