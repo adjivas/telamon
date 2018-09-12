@@ -50,20 +50,20 @@ impl Ast {
         for statement in self.statements.iter() {
             statement.declare(&mut context)?;
         }
-        // define
-        for statement in self.statements.iter() {
-            statement.define(&mut context, &mut ir)?;
-        }
         // typing context
-        for statement in self.statements {
-            ir.add_statement(statement);
+        for statement in self.statements.iter() {
+            ir.add_statement(statement.to_owned());
+        }
+        // define
+        for statement in self.statements.into_iter() {
+            statement.define(&mut context, &mut ir)?;
         }
         Ok(ir.finalize())
     }
 }
 
 /// A toplevel definition or constraint.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Statement {
     ChoiceDef(ChoiceDef),
     TriggerDef {
@@ -85,7 +85,7 @@ impl Statement {
     }
 
     pub fn define(
-        &self, context: &mut CheckerContext, ir: &mut TypingContext
+        self, context: &mut CheckerContext, ir: &mut TypingContext
     ) -> Result<(), TypeError> {
         match self {
             Statement::SetDef(def) => def.define(context, ir),
