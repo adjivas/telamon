@@ -135,6 +135,11 @@
 <span id="135">135</span>
 <span id="136">136</span>
 <span id="137">137</span>
+<span id="138">138</span>
+<span id="139">139</span>
+<span id="140">140</span>
+<span id="141">141</span>
+<span id="142">142</span>
 </pre><pre class="rust ">
 <span class="doccomment">//! Describes CUDA-enabled GPUs.</span>
 <span class="kw">use</span> <span class="ident">codegen</span>::<span class="ident">Function</span>;
@@ -179,6 +184,10 @@
         <span class="number">0</span>
     }
 
+    <span class="kw">fn</span> <span class="ident">max_inner_block_size</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">u32</span> {
+        <span class="number">0</span>
+    }
+
     <span class="kw">fn</span> <span class="ident">max_threads</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">u32</span> {
         (<span class="ident">num_cpus</span>::<span class="ident">get</span>()) <span class="kw">as</span> <span class="ident">u32</span>
     }
@@ -213,9 +222,10 @@
 
     <span class="kw">fn</span> <span class="ident">add_block_overhead</span>(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">_predicated_dims_size</span>: <span class="ident">u64</span>,
-        <span class="ident">_max_threads_per_blocks</span>: <span class="ident">u64</span>,
-        <span class="ident">_pressure</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">HwPressure</span>,
+        <span class="kw">_</span>: <span class="ident">model</span>::<span class="ident">size</span>::<span class="ident">FactorRange</span>,
+        <span class="kw">_</span>: <span class="ident">model</span>::<span class="ident">size</span>::<span class="ident">FactorRange</span>,
+        <span class="kw">_</span>: <span class="ident">model</span>::<span class="ident">size</span>::<span class="ident">Range</span>,
+        <span class="kw">_</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">HwPressure</span>,
     ) {
     }
 
@@ -227,8 +237,8 @@
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         <span class="ident">_space</span>: <span class="kw-2">&amp;</span><span class="ident">SearchSpace</span>,
         <span class="ident">_dim_sizes</span>: <span class="kw-2">&amp;</span><span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">ir</span>::<span class="ident">DimId</span>, <span class="ident">u32</span><span class="op">&gt;</span>,
-        <span class="ident">_nesting</span>: <span class="kw-2">&amp;</span><span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">ir</span>::<span class="ident">BBId</span>, <span class="ident">model</span>::<span class="ident">Nesting</span><span class="op">&gt;</span>,
-        <span class="ident">_bb</span>: <span class="kw-2">&amp;</span><span class="ident">ir</span>::<span class="ident">Statement</span>,
+        <span class="ident">_nesting</span>: <span class="kw-2">&amp;</span><span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">ir</span>::<span class="ident">StmtId</span>, <span class="ident">model</span>::<span class="ident">Nesting</span><span class="op">&gt;</span>,
+        <span class="ident">_stmt</span>: <span class="kw-2">&amp;</span><span class="ident">ir</span>::<span class="ident">Statement</span>,
         <span class="kw">_</span>: <span class="kw-2">&amp;</span><span class="ident">device</span>::<span class="ident">Context</span>,
     ) <span class="op">-&gt;</span> <span class="ident">model</span>::<span class="ident">HwPressure</span> {
         <span class="comment">// TODO(model): implement model</span>

@@ -456,6 +456,7 @@
     <span class="ident">induction_vars</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">InductionVar</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;&gt;</span>,
     <span class="ident">mem_blocks</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">InternalMemoryRegion</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;&gt;</span>,
     <span class="ident">init_induction_levels</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">InductionLevel</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;&gt;</span>,
+    <span class="ident">values</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">ir</span>::<span class="ident">Value</span><span class="op">&gt;</span>,
     <span class="comment">// TODO(cleanup): remove dependency on the search space</span>
     <span class="ident">space</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">SearchSpace</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span>,
 }
@@ -481,8 +482,7 @@
                 <span class="ident">init_induction_levels</span>
                     .<span class="ident">iter</span>()
                     .<span class="ident">flat_map</span>(<span class="op">|</span><span class="ident">l</span><span class="op">|</span> <span class="ident">l</span>.<span class="ident">host_values</span>(<span class="ident">space</span>)),
-            )
-            .<span class="ident">collect</span>::<span class="op">&lt;</span><span class="ident">HashSet</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;&gt;</span>();
+            ).<span class="ident">collect</span>::<span class="op">&lt;</span><span class="ident">HashSet</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;&gt;</span>();
         <span class="kw">let</span> (<span class="ident">block_dims</span>, <span class="ident">thread_dims</span>, <span class="ident">cfg</span>) <span class="op">=</span> <span class="ident">cfg</span>::<span class="ident">build</span>(<span class="ident">space</span>, <span class="ident">insts</span>, <span class="ident">dims</span>);
         <span class="kw">let</span> <span class="ident">mem_blocks</span> <span class="op">=</span> <span class="ident">register_mem_blocks</span>(<span class="ident">space</span>, <span class="kw-2">&amp;</span><span class="ident">block_dims</span>);
         <span class="ident">device_code_args</span>.<span class="ident">extend</span>(
@@ -492,6 +492,7 @@
         );
         <span class="kw">let</span> <span class="ident">device_code_args</span> <span class="op">=</span> <span class="ident">device_code_args</span>.<span class="ident">into_iter</span>().<span class="ident">collect</span>();
         <span class="macro">debug</span><span class="macro">!</span>(<span class="string">&quot;compiling cfg {:?}&quot;</span>, <span class="ident">cfg</span>);
+        <span class="kw">let</span> <span class="ident">values</span> <span class="op">=</span> <span class="ident">space</span>.<span class="ident">ir_instance</span>().<span class="ident">values</span>().<span class="ident">cloned</span>().<span class="ident">collect_vec</span>();
         <span class="ident">Function</span> {
             <span class="ident">cfg</span>,
             <span class="ident">thread_dims</span>,
@@ -500,6 +501,7 @@
             <span class="ident">device_code_args</span>,
             <span class="ident">space</span>,
             <span class="ident">mem_blocks</span>,
+            <span class="ident">values</span>,
             <span class="ident">init_induction_levels</span>,
         }
     }
@@ -647,7 +649,7 @@
 <span class="macro">hash_from_key</span><span class="macro">!</span>(<span class="ident">ParamVal</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span>, <span class="ident">ParamVal</span>::<span class="ident">key</span>, <span class="lifetime">&#39;a</span>);
 
 <span class="doccomment">/// Uniquely identifies a `ParamVal`.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">PartialEq</span>, <span class="ident">Eq</span>, <span class="ident">Hash</span>, <span class="ident">Copy</span>, <span class="ident">Clone</span>)]</span>
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>, <span class="ident">Hash</span>, <span class="ident">Copy</span>, <span class="ident">Clone</span>)]</span>
 <span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">ParamValKey</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> {
     <span class="ident">External</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">ir</span>::<span class="ident">Parameter</span>),
     <span class="ident">Size</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">codegen</span>::<span class="ident">Size</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span>),
@@ -739,9 +741,9 @@
             <span class="prelude-val">Some</span>(
                 <span class="ident">block_dims</span>[<span class="number">1</span>..]
                     .<span class="ident">iter</span>()
-                    .<span class="ident">map</span>(<span class="op">|</span><span class="ident">d</span><span class="op">|</span> <span class="ident">d</span>.<span class="ident">size</span>().<span class="ident">clone</span>())
-                    .<span class="ident">chain</span>(<span class="ident">std</span>::<span class="ident">iter</span>::<span class="ident">once</span>(<span class="self">self</span>.<span class="ident">size</span>.<span class="ident">clone</span>()))
-                    .<span class="ident">map</span>(<span class="ident">ParamVal</span>::<span class="ident">Size</span>),
+                    .<span class="ident">map</span>(<span class="op">|</span><span class="ident">d</span><span class="op">|</span> <span class="ident">d</span>.<span class="ident">size</span>())
+                    .<span class="ident">chain</span>(<span class="ident">std</span>::<span class="ident">iter</span>::<span class="ident">once</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">size</span>))
+                    .<span class="ident">flat_map</span>(<span class="ident">ParamVal</span>::<span class="ident">from_size</span>),
             )
         } <span class="kw">else</span> {
             <span class="prelude-val">None</span>
@@ -809,12 +811,10 @@
             .<span class="ident">filter</span>(<span class="op">|</span><span class="op">&amp;&amp;</span><span class="ident">dim</span><span class="op">|</span> {
                 <span class="kw">let</span> <span class="ident">kind</span> <span class="op">=</span> <span class="ident">space</span>.<span class="ident">domain</span>().<span class="ident">get_dim_kind</span>(<span class="ident">dim</span>);
                 <span class="macro">unwrap</span><span class="macro">!</span>(<span class="ident">kind</span>.<span class="ident">is</span>(<span class="ident">DimKind</span>::<span class="ident">VECTOR</span> <span class="op">|</span> <span class="ident">DimKind</span>::<span class="ident">UNROLL</span>).<span class="ident">as_bool</span>())
-            })
-            .<span class="ident">map</span>(<span class="op">|</span><span class="kw-2">&amp;</span><span class="ident">dim</span><span class="op">|</span> {
+            }).<span class="ident">map</span>(<span class="op">|</span><span class="kw-2">&amp;</span><span class="ident">dim</span><span class="op">|</span> {
                 <span class="kw">let</span> <span class="ident">size</span> <span class="op">=</span> <span class="ident">space</span>.<span class="ident">ir_instance</span>().<span class="ident">dim</span>(<span class="ident">dim</span>).<span class="ident">size</span>();
                 (<span class="ident">dim</span>, <span class="macro">unwrap</span><span class="macro">!</span>(<span class="ident">codegen</span>::<span class="ident">Size</span>::<span class="ident">from_ir</span>(<span class="ident">size</span>, <span class="ident">space</span>).<span class="ident">as_int</span>()))
-            })
-            .<span class="ident">collect</span>();
+            }).<span class="ident">collect</span>();
         <span class="kw">let</span> <span class="ident">mem_flag</span> <span class="op">=</span> <span class="ident">instruction</span>
             .<span class="ident">as_mem_inst</span>()
             .<span class="ident">map</span>(<span class="op">|</span><span class="ident">inst</span><span class="op">|</span> <span class="ident">space</span>.<span class="ident">domain</span>().<span class="ident">get_inst_flag</span>(<span class="ident">inst</span>.<span class="ident">id</span>()));
